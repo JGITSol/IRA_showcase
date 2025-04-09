@@ -6,6 +6,7 @@ import streamlit as st
 import pickle
 import os
 from plotly.subplots import make_subplots
+from theme_utils import get_streamlit_theme, get_color_palette, get_color
 
 def load_model():
     """Load the trained model."""
@@ -48,34 +49,37 @@ def generate_risk_score(prediction, max_charge=50000):
 
 def plot_risk_gauge(risk_score):
     """Create an interactive gauge chart to visualize risk score using Plotly."""
+    # Get theme-aware colors
+    palette = get_color_palette()
+    
     # Define color scale based on risk score
     if risk_score <= 3:
-        color = "#00CC00"  # Brighter green
+        color = get_color('secondary')  # Green
     elif risk_score <= 7:
-        color = "#FFA500"  # Brighter orange
+        color = get_color('accent')  # Yellow/Orange
     else:
-        color = "#FF3333"  # Brighter red
+        color = get_color('warning')  # Red
     
     # Create gauge chart
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=risk_score,
         domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': "Risk Score", 'font': {'size': 24, 'color': '#333333'}},
+        title={'text': "Risk Score", 'font': {'size': 24, 'color': palette['text']}},
         number={'font': {'size': 40, 'color': color, 'weight': 'bold'}},
         gauge={
-            'axis': {'range': [0, 10], 'tickwidth': 2, 'tickcolor': "#333333", 'tickfont': {'size': 14}},
+            'axis': {'range': [0, 10], 'tickwidth': 2, 'tickcolor': palette['text'], 'tickfont': {'size': 14}},
             'bar': {'color': color, 'thickness': 0.8},
-            'bgcolor': "#F8F9FA",
+            'bgcolor': palette['surface'],
             'borderwidth': 2,
-            'bordercolor': "#666666",
+            'bordercolor': palette['text_secondary'],
             'steps': [
-                {'range': [0, 3], 'color': "rgba(0, 204, 0, 0.4)"},
-                {'range': [3, 7], 'color': "rgba(255, 165, 0, 0.4)"},
-                {'range': [7, 10], 'color': "rgba(255, 51, 51, 0.4)"}
+                {'range': [0, 3], 'color': palette['gauge_low']},
+                {'range': [3, 7], 'color': palette['gauge_medium']},
+                {'range': [7, 10], 'color': palette['gauge_high']}
             ],
             'threshold': {
-                'line': {'color': "#333333", 'width': 4},
+                'line': {'color': palette['text'], 'width': 4},
                 'thickness': 0.8,
                 'value': risk_score
             }
@@ -87,7 +91,7 @@ def plot_risk_gauge(risk_score):
         height=300,
         margin=dict(l=20, r=20, t=50, b=20),
         paper_bgcolor="rgba(0,0,0,0)",  # Transparent background to work with any theme
-        font={'color': "#333333", 'family': "Arial"},
+        font={'color': palette['text'], 'family': "Arial"},
         plot_bgcolor="rgba(0,0,0,0)"
     )
     
@@ -95,6 +99,9 @@ def plot_risk_gauge(risk_score):
 
 def plot_feature_importance(model):
     """Plot feature importance for the model using Plotly."""
+    # Get theme-aware colors
+    palette = get_color_palette()
+    
     if not hasattr(model, 'named_steps'):
         return None
     
@@ -134,7 +141,7 @@ def plot_feature_importance(model):
     })
     
     # Create color scale based on importance
-    colors = px.colors.sequential.Plasma  # Better contrast color scale
+    colors = px.colors.sequential[palette['importance_scale']]  # Use theme-aware color scale
     
     # Plot with Plotly
     fig = px.bar(
@@ -152,34 +159,37 @@ def plot_feature_importance(model):
         height=500,
         xaxis_title="Importance Score",
         yaxis_title="Feature",
-        font=dict(family="Arial", size=14, color="#333333"),
+        font=dict(family="Arial", size=14, color=palette['text']),
         margin=dict(l=20, r=20, t=50, b=20),
         paper_bgcolor="rgba(0,0,0,0)",  # Transparent background
-        plot_bgcolor="rgba(240, 240, 240, 0.7)",  # More opaque for better visibility
+        plot_bgcolor=palette['plot_bg'],  # Theme-aware background
         title={
             'text': 'Feature Importance',
-            'font': {'size': 20, 'color': '#333333'},
+            'font': {'size': 20, 'color': palette['text']},
             'x': 0.5,
             'xanchor': 'center'
         }
     )
     
     # Add grid lines for better readability
-    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='rgba(128, 128, 128, 0.5)', title_font={'color': '#333333'}, tickfont={'color': '#333333'})
-    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='rgba(128, 128, 128, 0.5)', title_font={'color': '#333333'}, tickfont={'color': '#333333'})
+    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor=palette['grid'], title_font={'color': palette['text']}, tickfont={'color': palette['text']})
+    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor=palette['grid'], title_font={'color': palette['text']}, tickfont={'color': palette['text']})
     
     return fig
 
 def plot_prediction_comparison(prediction, avg_charges):
     """Plot the prediction compared to average charges using Plotly."""
+    # Get theme-aware colors
+    palette = get_color_palette()
+    
     # Create data for plotting
     categories = ['Your Prediction', 'Average Charges']
     values = [prediction, avg_charges]
     
     # Determine colors based on values with better contrast
-    colors = ['#4285F4', '#34A853']  # Brighter blue and green
+    colors = [palette['comparison_default'], palette['comparison_good']]  # Default and good colors
     if prediction > avg_charges:
-        colors[0] = '#EA4335'  # Brighter red for higher than average
+        colors[0] = palette['comparison_bad']  # Use warning color for higher than average
     
     # Create bar chart
     fig = go.Figure()
@@ -202,7 +212,7 @@ def plot_prediction_comparison(prediction, avg_charges):
         y0=avg_charges,
         x1=1.5,
         y1=avg_charges,
-        line=dict(color="#FBBC05", width=3, dash="dash")
+        line=dict(color=palette['accent'], width=3, dash="dash")
     )
     
     # Update layout for better appearance
@@ -213,13 +223,13 @@ def plot_prediction_comparison(prediction, avg_charges):
             'x': 0.5,
             'xanchor': 'center',
             'yanchor': 'top',
-            'font': {'size': 20, 'color': '#333333'}
+            'font': {'size': 20, 'color': palette['text']}
         },
         yaxis_title="Insurance Charges ($)",
-        font=dict(family="Arial", size=14, color="#333333"),
+        font=dict(family="Arial", size=14, color=palette['text']),
         margin=dict(l=20, r=20, t=80, b=20),
         paper_bgcolor="rgba(0,0,0,0)",  # Transparent background
-        plot_bgcolor="rgba(240, 240, 240, 0.7)",  # More opaque for better visibility
+        plot_bgcolor=palette['plot_bg'],  # Theme-aware background
         height=400
     )
     
@@ -227,9 +237,9 @@ def plot_prediction_comparison(prediction, avg_charges):
     fig.update_yaxes(
         showgrid=True, 
         gridwidth=1, 
-        gridcolor='rgba(128, 128, 128, 0.5)',
-        title_font={'color': '#333333'},
-        tickfont={'color': '#333333'},
+        gridcolor=palette['grid'],
+        title_font={'color': palette['text']},
+        tickfont={'color': palette['text']},
         tickprefix='$',
         tickformat=','
     )
@@ -240,11 +250,11 @@ def plot_prediction_comparison(prediction, avg_charges):
         y=avg_charges,
         text="Industry Average",
         showarrow=False,
-        font=dict(size=14, color="#FBBC05", family="Arial"),
+        font=dict(size=14, color=palette['accent'], family="Arial"),
         xshift=10,
         yshift=10,
-        bgcolor="rgba(255,255,255,0.7)",
-        bordercolor="#FBBC05",
+        bgcolor=palette['surface'] if 'dark' in get_streamlit_theme() else "rgba(255,255,255,0.7)",
+        bordercolor=palette['accent'],
         borderwidth=1,
         borderpad=4,
         opacity=0.9

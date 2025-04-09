@@ -6,10 +6,9 @@ import os
 
 # Import custom modules
 from database import Database
-from utils import (
-    load_model, predict_insurance_charges, generate_risk_score,
-    plot_risk_gauge, plot_feature_importance, plot_prediction_comparison
-)
+from utils import load_model, predict_insurance_charges, generate_risk_score
+from utils_plotly import plot_risk_gauge, plot_feature_importance, plot_prediction_comparison
+from theme_utils import get_streamlit_theme, get_color_palette
 
 # Set page configuration
 st.set_page_config(
@@ -155,7 +154,7 @@ def display_model_insights():
     feature_imp_fig = plot_feature_importance(model)
     
     if feature_imp_fig:
-        st.pyplot(feature_imp_fig)
+        st.plotly_chart(feature_imp_fig, use_container_width=True)
     else:
         st.warning("Feature importance visualization is not available for this model.")
     
@@ -281,7 +280,7 @@ def main():
             with col2:
                 # Risk gauge visualization
                 risk_gauge = plot_risk_gauge(st.session_state.risk_score)
-                st.pyplot(risk_gauge)
+                st.plotly_chart(risk_gauge, use_container_width=True)
             
             # Comparison with average
             st.markdown("---")
@@ -289,7 +288,7 @@ def main():
             
             avg_charges = 13270.42  # Example average value
             comparison_fig = plot_prediction_comparison(st.session_state.prediction, avg_charges)
-            st.pyplot(comparison_fig)
+            st.plotly_chart(comparison_fig, use_container_width=True)
             
             # Risk factors explanation
             st.markdown("---")
