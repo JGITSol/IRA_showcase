@@ -2,65 +2,18 @@ import streamlit as st
 
 def get_streamlit_theme():
     """
-    Detect the current Streamlit theme (light or dark).
-    Returns 'light' or 'dark' based on the current theme.
+    Get the current Streamlit theme or return a default theme.
+    Returns a dictionary with theme properties.
     """
-    # Check if we're running in Streamlit
-    if not st._is_running_with_streamlit:
-        return 'light'  # Default to light theme when not running in Streamlit
-    
-    # Try to get theme from session state if previously detected
-    if 'theme' in st.session_state:
-        return st.session_state.theme
-    
-    # Use JavaScript to detect the theme
-    # This is done by checking the background color of the body element
-    theme_detector_code = """
-    <script>
-    const doc = window.parent.document;
-    const body = doc.querySelector('body');
-    const bgColor = window.getComputedStyle(body).backgroundColor;
-    
-    // Convert RGB to brightness
-    function getBrightness(color) {
-        // Extract RGB values
-        const rgb = color.match(/\d+/g);
-        if (!rgb || rgb.length < 3) return 128; // Default to middle brightness
-        
-        // Calculate brightness using perceived luminance formula
-        return (parseInt(rgb[0]) * 0.299 + parseInt(rgb[1]) * 0.587 + parseInt(rgb[2]) * 0.114);
+    # Return default theme instead of checking private attribute
+    # This avoids the AttributeError: module 'streamlit' has no attribute '_is_running_with_streamlit'
+    return {
+        'primaryColor': '#FF4B4B',
+        'backgroundColor': '#FFFFFF',
+        'secondaryBackgroundColor': '#F0F2F6',
+        'textColor': '#262730',
+        'font': 'sans serif',
     }
-    
-    const brightness = getBrightness(bgColor);
-    const theme = brightness > 128 ? 'light' : 'dark';
-    
-    // Send the theme to Python
-    window.parent.postMessage({type: 'streamlit:setComponentValue', value: theme}, '*');
-    </script>
-    """
-    
-    # Use a workaround to detect theme
-    # Since direct JavaScript execution is limited, we'll use a heuristic approach
-    # based on Streamlit's default themes
-    
-    # For now, we'll use a simpler approach by checking config if possible
-    try:
-        import streamlit.config as config
-        theme_option = config.get_option('theme.base')
-        if theme_option:
-            detected_theme = 'dark' if theme_option == 'dark' else 'light'
-            st.session_state.theme = detected_theme
-            return detected_theme
-    except:
-        pass
-    
-    # Fallback method: we'll try to detect based on common elements
-    # This is not 100% reliable but works in most cases
-    # We'll store the result in session state to avoid recalculating
-    
-    # Default to light theme
-    st.session_state.theme = 'light'
-    return 'light'
 
 # Define color palettes for light and dark themes
 COLOR_PALETTES = {
@@ -131,8 +84,9 @@ def get_color_palette():
     Get the color palette based on the current theme.
     Returns a dictionary of colors for the current theme.
     """
-    theme = get_streamlit_theme()
-    return COLOR_PALETTES[theme]
+    # Always use light theme for now since we can't reliably detect theme
+    # This avoids the error by not calling the problematic function
+    return COLOR_PALETTES['light']
 
 def get_color(color_name):
     """

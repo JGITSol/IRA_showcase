@@ -196,14 +196,14 @@ def view_prediction_details(prediction_id):
             
             # Switch to the prediction tab
             st.session_state.active_tab = "Predict"
-            st.experimental_rerun()
+            st.rerun()
     
     with col2:
         if st.button("Delete this prediction", key="delete_btn"):
             if db.delete_prediction(prediction_id):
                 st.success(f"Prediction with ID {prediction_id} deleted.")
                 time.sleep(1)
-                st.experimental_rerun()
+                st.rerun()
             else:
                 st.error(f"Failed to delete prediction with ID {prediction_id}.")
 
