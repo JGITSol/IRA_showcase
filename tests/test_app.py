@@ -55,12 +55,15 @@ class TestApp(unittest.TestCase):
         self.session_state_mock.children = 2
         self.session_state_mock.smoker = 'no'
         self.session_state_mock.region = 'northeast'
+        self.session_state_mock.prediction = None
+        self.session_state_mock.prediction_made = False
         
-        # Mock database add_prediction
+        # Configure the database mock
         self.db_instance_mock.add_prediction.return_value = 1
         
         # Call the function
-        app.make_prediction()
+        with patch('app.db', self.db_instance_mock):
+            app.make_prediction()
         
         # Verify the model was loaded
         self.load_model_mock.assert_called_once()
@@ -84,7 +87,7 @@ class TestApp(unittest.TestCase):
         )
         
         # Verify success message was shown
-        self.streamlit_mock.success.assert_called_once()
+        self.streamlit_mock.success.assert_called_once_with("Prediction saved with ID: 1")
     
     def test_make_prediction_model_none(self):
         """Test make_prediction when model is None."""
@@ -116,16 +119,30 @@ class TestApp(unittest.TestCase):
     
     def test_view_predictions_empty(self):
         """Test view_predictions when no predictions exist."""
-        # Set up mocks
+        # Mock empty predictions
         self.db_instance_mock.get_all_predictions.return_value = []
         
-        # Call the function
-        app.view_predictions()
+        # Mock the pandas DataFrame to handle empty list
+        with patch('app.pd.DataFrame') as df_mock:
+            # Setup the mock DataFrame
+            mock_df = MagicMock()
+            df_mock.return_value = mock_df
+            mock_df.__getitem__.return_value.tolist.return_value = []
+            
+            # This will prevent selectbox from being called with empty list
+            self.streamlit_mock.selectbox.return_value = None
         
-        # Verify info message was shown
-        self.streamlit_mock.info.assert_called_once_with(
-            "No predictions found in the database."
-        )
+            # Call the function
+            with patch('app.db', self.db_instance_mock):
+                app.view_predictions()
+            
+            # Verify info message was shown
+            self.streamlit_mock.info.assert_called_once_with(
+                "No predictions found in the database."
+            )
+        
+        # Verify selectbox was not called
+        self.streamlit_mock.selectbox.assert_not_called()
     
     def test_view_predictions_with_data(self):
         """Test view_predictions with existing predictions."""
@@ -136,6 +153,16 @@ class TestApp(unittest.TestCase):
              'prediction_date': '2023-01-01 12:00:00'}
         ]
         self.db_instance_mock.get_all_predictions.return_value = mock_predictions
+        
+        # Mock selectbox to return a valid prediction ID
+        self.streamlit_mock.selectbox.return_value = 1
+        
+        # Mock get_prediction_by_id to return the prediction data
+        self.db_instance_mock.get_prediction_by_id.return_value = mock_predictions[0]
+        
+        # Mock columns
+        col_mocks = [MagicMock(), MagicMock()]
+        self.streamlit_mock.columns.return_value = col_mocks
         
         # Call the function
         app.view_predictions()

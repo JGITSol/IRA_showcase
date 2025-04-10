@@ -54,11 +54,11 @@ def plot_risk_gauge(risk_score):
     
     # Define color scale based on risk score
     if risk_score <= 3:
-        color = get_color('secondary')  # Green
+        color = get_color('comparison_good')  # Green
     elif risk_score <= 7:
-        color = get_color('accent')  # Yellow/Orange
+        color = get_color('comparison_default')  # Yellow/Orange
     else:
-        color = get_color('warning')  # Red
+        color = get_color('comparison_bad')  # Red
     
     # Create gauge chart
     fig = go.Figure(go.Indicator(
@@ -212,7 +212,7 @@ def plot_prediction_comparison(prediction, avg_charges):
         y0=avg_charges,
         x1=1.5,
         y1=avg_charges,
-        line=dict(color=palette['accent'], width=3, dash="dash")
+        line=dict(color=palette['comparison_default'], width=3, dash="dash")
     )
     
     # Update layout for better appearance
@@ -250,11 +250,11 @@ def plot_prediction_comparison(prediction, avg_charges):
         y=avg_charges,
         text="Industry Average",
         showarrow=False,
-        font=dict(size=14, color=palette['accent'], family="Arial"),
+        font=dict(size=14, color=palette['comparison_default'], family="Arial"),
         xshift=10,
         yshift=10,
         bgcolor=palette['surface'] if 'dark' in get_streamlit_theme() else "rgba(255,255,255,0.7)",
-        bordercolor=palette['accent'],
+        bordercolor=palette['comparison_default'],
         borderwidth=1,
         borderpad=4,
         opacity=0.9
