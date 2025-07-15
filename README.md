@@ -1,56 +1,211 @@
-# Insurance Risk Prediction Application
+# Insurance Risk Analyzer (IRA) Showcase
 
-## Overview
+A production-ready FastAPI application for analyzing insurance risk and predicting insurance charges based on demographic and health data. This application provides a robust API for insurance risk assessment with features for user management, prediction history, and risk analysis.
 
-This application predicts insurance charges and assesses risk factors based on demographic and health information. It uses machine learning to provide accurate predictions and visualizations to help understand risk factors.
+## 🚀 Features
 
-## Features
+- **Predictive Analytics**: Machine learning models for insurance charge prediction
+- **User Management**: Secure authentication and authorization with JWT
+- **RESTful API**: Fully documented endpoints with OpenAPI and Swagger UI
+- **Asynchronous Processing**: High-performance async database operations
+- **Containerized**: Ready for Docker and Kubernetes deployment
+- **Scalable**: Designed for horizontal scaling
+- **Monitoring**: Built-in health checks and metrics
+- **CI/CD Ready**: GitHub Actions workflow for testing and deployment
 
-- Predict insurance charges based on personal information
-- Calculate risk scores to assess insurance risk
-- Store and retrieve prediction history
-- Visualize risk factors and prediction comparisons
-- Explore model insights and feature importance
+## 🛠️ Prerequisites
 
-## Installation
+- Python 3.11+
+- PostgreSQL 13+
+- Redis 6+ (for caching and async tasks)
+- Docker 20.10+ (for containerized deployment)
+- Docker Compose 2.0+
+- Make (optional, for convenience commands)
 
-### Prerequisites
+## 🚀 Quick Start
 
-- Python 3.8 or higher
-- pip (Python package installer)
+### Using Docker Compose (Recommended)
 
-### Setup
+The easiest way to get started is with Docker Compose:
 
-1. Clone the repository:
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/ira-showcase.git
+cd ira-showcase
+
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env with your configuration
+
+# Start the application
+make up
+```
+
+This will start all services:
+
+- FastAPI application: `http://localhost:8000`
+- PostgreSQL database
+- PgAdmin: `http://localhost:5050`
+- Redis
+
+### Manual Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/ira-showcase.git
+   cd ira-showcase
    ```
-   git clone https://github.com/yourusername/insurance-risk-predictor.git
-   cd insurance-risk-predictor
-   ```
 
-2. Create and activate a virtual environment (optional but recommended):
-   ```
+2. **Set up Python environment**
+   ```bash
+   # Create and activate virtual environment
    python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    
-   # On Windows
-   venv\Scripts\activate
-   
-   # On macOS/Linux
-   source venv/bin/activate
-   ```
-
-3. Install dependencies:
-   ```
+   # Install dependencies
+   pip install --upgrade pip
    pip install -r requirements.txt
+   pip install -r requirements-dev.txt  # For development
    ```
 
-4. Train the model (if not already trained):
-   ```
-   python model.py
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
    ```
 
-## Usage
+4. **Set up the database**
+   ```bash
+   # Start PostgreSQL and Redis services
+   docker-compose up -d postgres redis
+   
+   # Run database migrations
+   make db-upgrade
+   
+   # Seed initial data (optional)
+   make db-seed
+   ```
 
-### Running the Application
+5. **Run the application**
+   ```bash
+   # Development mode with hot reload
+   make dev
+   
+   # Production mode
+   make start
+   ```
+
+## 🔧 Configuration
+
+### Environment Variables
+
+Create a `.env` file based on `.env.example` and configure the following:
+
+```env
+# Application
+ENVIRONMENT=development
+DEBUG=true
+LOG_LEVEL=info
+SECRET_KEY=your-secret-key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Database
+DB_DRIVER=postgresql+asyncpg
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_NAME=insurance_risk
+POOL_SIZE=5
+POOL_OVERFLOW=10
+POOL_RECYCLE=3600
+
+# Redis
+REDIS_HOST=redis
+REDIS_PORT=6379
+REDIS_DB=0
+
+# CORS
+FRONTEND_URL=http://localhost:3000
+
+# ML Model
+MODEL_PATH=./models/insurance_risk_model.pkl
+```
+
+### Database Migrations
+
+This project uses Alembic for database migrations:
+
+```bash
+# Create a new migration
+make db-revision message="your migration message"
+
+# Apply all pending migrations
+make db-upgrade
+
+# Revert the last migration
+make db-downgrade
+
+# Show current migration status
+make db-current
+```
+
+## 🧪 Testing
+
+Run the test suite:
+
+```bash
+# Run all tests
+make test
+
+# Run tests with coverage
+make test-cov
+
+# Run specific test file
+pytest tests/path/to/test_file.py -v
+```
+
+## 🐳 Deployment
+
+### Production Deployment
+
+1. Update the `.env` file with production settings
+2. Build and start the production stack:
+   ```bash
+   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+   ```
+
+### Kubernetes
+
+For Kubernetes deployment, see the `k8s/` directory for example manifests.
+
+## 📚 API Documentation
+
+Once the application is running, you can access:
+
+- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+- **Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- FastAPI for the amazing web framework
+- SQLAlchemy for the ORM
+- Pydantic for data validation
+- All other open-source libraries used in this project
 
 Start the Streamlit application:
 
