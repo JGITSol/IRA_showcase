@@ -62,8 +62,12 @@ class TestApp(unittest.TestCase):
         self.db_instance_mock.add_prediction.return_value = 1
         
         # Call the function
+        # We patch 'app.db' directly to ensure our mock is used.
         with patch('app.db', self.db_instance_mock):
-            app.make_prediction()
+            result = app.make_prediction()
+        
+        # Verify the function returned True on success
+        self.assertTrue(result)
         
         # Verify the model was loaded
         self.load_model_mock.assert_called_once()

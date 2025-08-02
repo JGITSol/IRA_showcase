@@ -207,13 +207,40 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Pydantic for data validation
 - All other open-source libraries used in this project
 
-Start the Streamlit application:
+### Quick Start Options
 
-```
-streamlit run app.py
+#### Option 1: Streamlit Application (Recommended for Demo)
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Train the model (first time only)
+python train_model.py
+
+# Run the Streamlit app
+streamlit run app_plotly.py
 ```
 
 This will launch the application in your default web browser at `http://localhost:8501`.
+
+#### Option 2: FastAPI Server (Production Ready)
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the FastAPI server
+python -m uvicorn app.main:app --reload
+```
+
+Access the API at `http://localhost:8000` and documentation at `http://localhost:8000/docs`.
+
+#### Option 3: Docker Deployment
+```bash
+# Build and run with Docker Compose
+docker-compose up --build
+```
+
+This starts all services including the API, database, and monitoring.
 
 ### Making Predictions
 

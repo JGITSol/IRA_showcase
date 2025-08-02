@@ -1,0 +1,184 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.3, pytest-8.4.1, pluggy-1.6.0 -- D:\REPOS\IRA_showcase\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: D:\REPOS\IRA_showcase
+configfile: pytest.ini
+plugins: asyncio-1.1.0, cov-6.2.1, mock-3.14.1, xdist-3.8.0
+asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 49 items / 15 errors
+
+=================================== ERRORS ====================================
+________________________ ERROR collecting test_api.py _________________________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\test_api.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+test_api.py:6: in <module>
+    import requests
+E   ModuleNotFoundError: No module named 'requests'
+___________________ ERROR collecting tests/test_api_auth.py ___________________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_api_auth.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_api_auth.py:4: in <module>
+    from fastapi.testclient import TestClient
+E   ModuleNotFoundError: No module named 'fastapi'
+_______________ ERROR collecting tests/test_api_predictions.py ________________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_api_predictions.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_api_predictions.py:4: in <module>
+    from fastapi.testclient import TestClient
+E   ModuleNotFoundError: No module named 'fastapi'
+__________________ ERROR collecting tests/test_core_cache.py __________________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_core_cache.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_core_cache.py:8: in <module>
+    from app.core.cache import CacheManager, cache, cached, cache_key_for_prediction
+app\core\__init__.py:3: in <module>
+    from .config import settings
+app\core\config.py:8: in <module>
+    from pydantic import AnyHttpUrl, Field, PostgresDsn, field_validator, ConfigDict, computed_field
+E   ModuleNotFoundError: No module named 'pydantic'
+_______________ ERROR collecting tests/test_core_monitoring.py ________________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_core_monitoring.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_core_monitoring.py:6: in <module>
+    from fastapi import Request, Response
+E   ModuleNotFoundError: No module named 'fastapi'
+______________ ERROR collecting tests/test_core_rate_limiting.py ______________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_core_rate_limiting.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_core_rate_limiting.py:6: in <module>
+    from fastapi import Request, HTTPException
+E   ModuleNotFoundError: No module named 'fastapi'
+_________________ ERROR collecting tests/test_enhanced_app.py _________________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_enhanced_app.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_enhanced_app.py:4: in <module>
+    import pandas as pd
+E   ModuleNotFoundError: No module named 'pandas'
+________________ ERROR collecting tests/test_enhanced_utils.py ________________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_enhanced_utils.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_enhanced_utils.py:4: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_______________ ERROR collecting tests/test_integration_api.py ________________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_integration_api.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_integration_api.py:4: in <module>
+    from fastapi.testclient import TestClient
+E   ModuleNotFoundError: No module named 'fastapi'
+___________________ ERROR collecting tests/test_main_app.py ___________________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_main_app.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_main_app.py:4: in <module>
+    from fastapi.testclient import TestClient
+E   ModuleNotFoundError: No module named 'fastapi'
+____________________ ERROR collecting tests/test_model.py _____________________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_model.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_model.py:4: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_____________ ERROR collecting tests/test_services_prediction.py ______________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_services_prediction.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_services_prediction.py:4: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_________________ ERROR collecting tests/test_theme_utils.py __________________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_theme_utils.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_theme_utils.py:12: in <module>
+    from theme_utils import get_streamlit_theme_config, get_color_palette, DEFAULT_LIGHT_THEME, DEFAULT_DARK_THEME
+theme_utils.py:1: in <module>
+    import streamlit as st
+E   ModuleNotFoundError: No module named 'streamlit'
+____________________ ERROR collecting tests/test_utils.py _____________________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_utils.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_utils.py:4: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+_________________ ERROR collecting tests/test_utils_plotly.py _________________
+ImportError while importing test module 'D:\REPOS\IRA_showcase\tests\test_utils_plotly.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Users\jedrz\AppData\Local\Programs\Python\Python311\Lib\importlib\__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_utils_plotly.py:6: in <module>
+    import numpy as np
+E   ModuleNotFoundError: No module named 'numpy'
+=========================== short test summary info ===========================
+ERROR test_api.py
+ERROR tests/test_api_auth.py
+ERROR tests/test_api_predictions.py
+ERROR tests/test_core_cache.py
+ERROR tests/test_core_monitoring.py
+ERROR tests/test_core_rate_limiting.py
+ERROR tests/test_enhanced_app.py
+ERROR tests/test_enhanced_utils.py
+ERROR tests/test_integration_api.py
+ERROR tests/test_main_app.py
+ERROR tests/test_model.py
+ERROR tests/test_services_prediction.py
+ERROR tests/test_theme_utils.py
+ERROR tests/test_utils.py
+ERROR tests/test_utils_plotly.py
+!!!!!!!!!!!!!!!!!! Interrupted: 15 errors during collection !!!!!!!!!!!!!!!!!!!
+============================= 15 errors in 0.47s ==============================

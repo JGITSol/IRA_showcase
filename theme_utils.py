@@ -1,7 +1,7 @@
 import streamlit as st
-import re # For hex validation
+import re  # For hex validation
 
-# Default theme settings (can be expanded and customized)
+# Default theme settings
 DEFAULT_LIGHT_THEME = {
     'primaryColor': '#FF4B4B',
     'backgroundColor': '#FFFFFF',
@@ -11,23 +11,40 @@ DEFAULT_LIGHT_THEME = {
 }
 
 DEFAULT_DARK_THEME = {
-    'primaryColor': '#FF4B4B', # Adjust if a different primary color is desired for dark theme
+    'primaryColor': '#FF4B4B',
     'backgroundColor': '#0E1117',
     'secondaryBackgroundColor': '#262730',
     'textColor': '#FAFAFA',
     'font': 'sans serif',
 }
 
-# Define color palettes (ensure these match your actual project's palettes)
-LIGHT_PALETTE = [
-    "#000080", "#0000CD", "#0000FF", "#1E90FF", "#4169E1", 
-    "#6495ED", "#87CEEB", "#ADD8E6", "#B0E0E6", "#E0FFFF"
-]
+# Define color palettes
+LIGHT_PALETTE = {
+    'primary': '#FF4B4B',
+    'background': '#FFFFFF',
+    'secondary_background': '#F0F2F6',
+    'text': '#262730',
+    'grid': '#DDDDDD',
+    'success': '#198754',
+    'warning': '#FFC107',
+    'danger': '#DC3545',
+    'info': '#0DCAF0',
+    'importance_scale': 'Blues',
+}
 
-DARK_PALETTE = [
-    "#4B0082", "#8A2BE2", "#9370DB", "#BA55D3", "#DA70D6", 
-    "#FF00FF", "#FF69B4", "#FFB6C1", "#FFC0CB", "#FFE4E1"
-]
+DARK_PALETTE = {
+    'primary': '#FF4B4B',
+    'background': '#0E1117',
+    'secondary_background': '#262730',
+    'text': '#FAFAFA',
+    'grid': '#444444',
+    'success': '#28A745',
+    'warning': '#FFC107',
+    'danger': '#DC3545',
+    'info': '#17A2B8',
+    'importance_scale': 'Viridis',
+}
+
 
 def get_streamlit_theme() -> str:
     """
@@ -61,80 +78,68 @@ def get_streamlit_theme() -> str:
             return "light" 
     except Exception:
         # Catch any other unexpected errors during theme detection
-        return "light" # Default to light theme as a safe fallback
+        return "light"  # Default to light theme as a safe fallback
 
-def get_color_palette() -> list[str]:
+
+def get_color_palette(theme: str = None) -> dict:
     """
-    Returns a list of hex color codes based on the current Streamlit theme.
+    Returns a color palette dictionary based on the current Streamlit theme.
 
-    Uses `get_streamlit_theme()` to determine the active theme and returns
-    either DARK_PALETTE or LIGHT_PALETTE accordingly.
+    Args:
+        theme: Optional theme override ('light' or 'dark')
 
     Returns:
-        list[str]: A list of hex color strings.
+        dict: A dictionary of color mappings
     """
-    theme = get_streamlit_theme()
+    if theme is None:
+        theme = get_streamlit_theme()
+    
     if theme == "dark":
         return DARK_PALETTE
     else:
         return LIGHT_PALETTE
 
+
 def hex_to_rgba(hex_color: str, alpha: float) -> str:
     """
-    Converts a HEX color string (with or without '#', 3 or 6 digits) to an RGBA string.
+    Converts a HEX color string to an RGBA string.
 
     Args:
-        hex_color (str): The hex color string (e.g., "#RRGGBB", "RRGGBB", "#RGB", "RGB").
-        alpha (float): The alpha transparency value (0.0 to 1.0).
+        hex_color (str): The hex color string (e.g., "#RRGGBB", "RRGGBB")
+        alpha (float): The alpha transparency value (0.0 to 1.0)
 
     Returns:
-        str: The RGBA color string (e.g., "rgba(r,g,b,a)").
-
-    Raises:
-        ValueError: If the hex_color string is invalid or alpha is out
+        str: The RGBA color string (e.g., "rgba(r,g,b,a)")
     """
-    current_theme_mode = get_streamlit_theme_config() # Use the robust theme detection
+    # Remove '#' if present
+    hex_color = hex_color.lstrip('#')
+    
+    # Validate hex color
+    if not re.match(r'^[0-9A-Fa-f]{6}$', hex_color):
+        raise ValueError(f"Invalid hex color: {hex_color}")
+    
+    # Convert to RGB
+    r = int(hex_color[0:2], 16)
+    g = int(hex_color[2:4], 16)
+    b = int(hex_color[4:6], 16)
+    
+    # Validate alpha
+    if not 0.0 <= alpha <= 1.0:
+        raise ValueError(f"Alpha must be between 0.0 and 1.0, got: {alpha}")
+    
+    return f"rgba({r},{g},{b},{alpha})"
 
-    if current_theme_mode == "dark":
-        return {
-            'primary': DEFAULT_DARK_THEME.get('primaryColor'),
-            'background': DEFAULT_DARK_THEME.get('backgroundColor'),
-            'secondary_background': DEFAULT_DARK_THEME.get('secondaryBackgroundColor'),
-            'text': DEFAULT_DARK_THEME.get('textColor'),
-            'grid': '#444444', # Example grid color for dark theme
-            'success': '#28A745',
-            'warning': '#FFC107',
-            'danger': '#DC3545',
-            'info': '#17A2B8',
-        }
-    else: # Light theme (default)
-        return {
-            'primary': DEFAULT_LIGHT_THEME.get('primaryColor'),
-            'background': DEFAULT_LIGHT_THEME.get('backgroundColor'),
-            'secondary_background': DEFAULT_LIGHT_THEME.get('secondaryBackgroundColor'),
-            'text': DEFAULT_LIGHT_THEME.get('textColor'),
-            'grid': '#DDDDDD', # Example grid color for light theme
-            'success': '#198754',
-            'warning': '#FFC107',
-            'danger': '#DC3545',
-            'info': '#0DCAF0',
-        }
 
-# The original problematic function (around line 9 in your traceback) would have been:
-# def get_streamlit_theme():
-#     if not st._is_running_with_streamlit: # This caused the AttributeError
-#         # ...
-# This function is now effectively replaced by get_streamlit_theme_config().
-# Ensure any calls to a previous get_streamlit_theme() are updated if they expected a different return type.
-def get_color(color_name):
+def get_color(color_name: str, theme: str = None) -> str:
     """
     Get a specific color from the current theme's palette.
     
     Args:
         color_name: The name of the color to get
+        theme: Optional theme override
         
     Returns:
         The color value as a string
     """
-    palette = get_color_palette()
+    palette = get_color_palette(theme)
     return palette.get(color_name, palette['primary'])  # Default to primary if color not found
