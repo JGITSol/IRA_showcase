@@ -36,6 +36,12 @@ The Insurance Risk Prediction Application is a Streamlit-based web application t
 2. **Test Runner**
    - `run_tests.py`: Script to run all tests at once
 
+3. **UI Regression (Puppeteer)**
+   - Located in `tests/puppeteer`
+   - Uses Node.js and Puppeteer to open project URLs, assert availability, and capture screenshots
+   - Run with `cd tests/puppeteer && npm install && npm test`
+   - Supports overrides such as `npm test -- --dry-run` (plan only) and `npm test -- --headful` (visible browser)
+
 ## Installation and Setup
 
 ### Prerequisites

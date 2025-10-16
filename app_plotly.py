@@ -9,8 +9,11 @@ import os
 # Import custom modules
 from database import Database
 from utils_plotly import (
-    load_model, predict_insurance_charges, generate_risk_score,
-    plot_risk_gauge, plot_feature_importance, plot_prediction_comparison
+    load_model,
+    plot_feature_importance,
+    plot_prediction_comparison,
+    plot_risk_gauge,
+    predict_insurance_charges,
 )
 
 # Set page configuration
@@ -73,10 +76,10 @@ db = Database()
 # Define functions
 def make_prediction():
     """Make a prediction based on user inputs and save to database."""
-    # Load model
-    model = load_model()
+    # Load model bundle
+    bundle = load_model()
     
-    if model is None:
+    if bundle is None:
         st.error("Failed to load model. Please ensure the model has been trained.")
         return False
     
@@ -89,18 +92,35 @@ def make_prediction():
     region = st.session_state.region
     
     # Make prediction
-    prediction = predict_insurance_charges(model, age, gender, bmi, children, smoker, region)
+    prediction_result = predict_insurance_charges(bundle, age, gender, bmi, children, smoker, region)
     
-    if prediction is not None:
-        # Calculate risk score
-        risk_score = generate_risk_score(prediction)
-        
+    if prediction_result is not None:
+        predicted_charges = prediction_result["predicted_charges"]
+        risk_score = prediction_result["risk_score"]
+        confidence = prediction_result["confidence"]
+        confidence_interval = prediction_result["confidence_interval"]
+
         # Update session state
-        st.session_state.prediction = prediction
+        st.session_state.prediction = predicted_charges
         st.session_state.risk_score = risk_score
+        st.session_state.confidence = confidence
+        st.session_state.confidence_interval = confidence_interval
+        st.session_state.prediction_details = prediction_result
         
         # Save prediction to database
-        prediction_id = db.add_prediction(age, gender, bmi, children, smoker, region, prediction)
+        prediction_id = db.add_prediction(
+            age,
+            gender,
+            bmi,
+            children,
+            smoker,
+            region,
+            predicted_charges,
+            risk_score,
+            confidence,
+            confidence_interval.get("lower") if confidence_interval else None,
+            confidence_interval.get("upper") if confidence_interval else None,
+        )
         
         st.session_state.prediction_made = True
         
@@ -124,6 +144,10 @@ def view_predictions():
     
     # Format currency values
     df['predicted_charges'] = df['predicted_charges'].apply(lambda x: f"${x:.2f}")
+    if 'risk_score' in df.columns:
+        df['risk_score'] = df['risk_score'].apply(lambda x: f"{x:.0f}/100" if x is not None else "-")
+    if 'confidence' in df.columns:
+        df['confidence'] = df['confidence'].apply(lambda x: f"{x*100:.1f}%" if x is not None else "-")
     
     # Display as table with modern styling
     st.write("### Prediction History")
@@ -143,6 +167,11 @@ def view_prediction_details(prediction_id):
     if not prediction:
         st.error(f"Prediction with ID {prediction_id} not found.")
         return
+    
+    confidence_interval = {
+        "lower": prediction.get('ci_lower'),
+        "upper": prediction.get('ci_upper')
+    }
     
     # Display prediction details in a modern card layout
     st.write("### Prediction Details")
@@ -175,9 +204,16 @@ def view_prediction_details(prediction_id):
             st.write(f"**Predicted Charges:** ${prediction['predicted_charges']:.2f}")
             st.write(f"**Prediction Date:** {prediction['prediction_date']}")
             
-            # Calculate risk score for display
-            risk_score = generate_risk_score(prediction['predicted_charges'])
-            st.write(f"**Risk Score:** {risk_score}/10")
+            risk_score_value = prediction.get('risk_score')
+            if risk_score_value is not None:
+                st.write(f"**Risk Percentile:** {risk_score_value:.0f}/100")
+            confidence_value = prediction.get('confidence')
+            if confidence_value is not None:
+                st.write(f"**Model Confidence:** {confidence_value*100:.1f}%")
+            if confidence_interval['lower'] is not None and confidence_interval['upper'] is not None:
+                st.write(
+                    f"**Confidence Interval (95%):** ${confidence_interval['lower']:.2f} – ${confidence_interval['upper']:.2f}"
+                )
     
     # Show actions for this prediction
     st.write("### Actions")
@@ -209,9 +245,9 @@ def view_prediction_details(prediction_id):
 
 def display_model_insights():
     """Display insights and visualizations about the model."""
-    model = load_model()
+    bundle = load_model()
     
-    if model is None:
+    if bundle is None:
         st.error("Failed to load model. Please ensure the model has been trained.")
         return
     
@@ -221,7 +257,7 @@ def display_model_insights():
     st.write("### Feature Importance")
     st.write("This chart shows which factors have the most influence on insurance charges:")
     
-    feature_imp_fig = plot_feature_importance(model)
+    feature_imp_fig = plot_feature_importance(bundle)
     
     if feature_imp_fig:
         st.plotly_chart(feature_imp_fig, use_container_width=True)
@@ -243,11 +279,17 @@ def display_model_insights():
     # Make predictions for each profile
     results = []
     for profile in profiles:
-        pred = predict_insurance_charges(
-            model, profile["age"], profile["gender"], profile["bmi"], 
-            profile["children"], profile["smoker"], profile["region"]
+        result = predict_insurance_charges(
+            bundle,
+            profile["age"],
+            profile["gender"],
+            profile["bmi"],
+            profile["children"],
+            profile["smoker"],
+            profile["region"],
         )
-        results.append({"Profile": profile["name"], "Predicted Charges": pred})
+        if result:
+            results.append({"Profile": profile["name"], "Predicted Charges": result["predicted_charges"]})
     
     # Create a DataFrame for visualization
     results_df = pd.DataFrame(results)
@@ -311,6 +353,12 @@ def main():
     
     if 'risk_score' not in st.session_state:
         st.session_state.risk_score = None
+    if 'confidence' not in st.session_state:
+        st.session_state.confidence = None
+    if 'confidence_interval' not in st.session_state:
+        st.session_state.confidence_interval = None
+    if 'prediction_details' not in st.session_state:
+        st.session_state.prediction_details = None
     
     # Input form default values
     if 'age' not in st.session_state:
@@ -366,16 +414,35 @@ def main():
             # Display prediction results if available
             if st.session_state.prediction_made:
                 
-                col1, col2 = st.columns(2)
+                col1, col2, col3 = st.columns(3)
                 
                 with col1:
-                    st.metric("Predicted Insurance Charges", f"${st.session_state.prediction:.2f}")
-                    st.metric("Risk Score", f"{st.session_state.risk_score}/10")
-                
+                    st.metric("Predicted Charges", f"${st.session_state.prediction:.2f}")
                 with col2:
-                    # Risk gauge visualization using Plotly
+                    st.metric("Risk Percentile", f"{st.session_state.risk_score:.0f}/100")
+                with col3:
+                    if st.session_state.confidence is not None:
+                        st.metric("Model Confidence", f"{st.session_state.confidence*100:.1f}%")
+                    else:
+                        st.metric("Model Confidence", "N/A")
+                
+                col_gauge, col_interval = st.columns((1, 1))
+                with col_gauge:
                     risk_gauge = plot_risk_gauge(st.session_state.risk_score)
                     st.plotly_chart(risk_gauge, use_container_width=True)
+                with col_interval:
+                    ci = st.session_state.confidence_interval
+                    if ci:
+                        st.markdown(
+                            f"""
+                            **95% Confidence Interval**
+                            
+                            - Lower bound: `${ci['lower']:.2f}`
+                            - Upper bound: `${ci['upper']:.2f}`
+                            """
+                        )
+                    else:
+                        st.info("Confidence interval unavailable for this prediction.")
                 
                 # Comparison with average
                 st.markdown("---")
@@ -446,7 +513,7 @@ def main():
                 st.markdown("")
         
         # This button needs to be outside the form
-        if st.button("Make a New Prediction"):
+    if st.button("Make a New Prediction"):
             st.session_state.prediction_made = False
             st.rerun()
     

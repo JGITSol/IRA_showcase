@@ -1,156 +1,122 @@
-"""Prediction service with enhanced features."""
+"""Prediction service backed by the shared modeling utilities."""
 
-import asyncio
-import pickle
-from typing import Any, Dict, List, Optional, Tuple
+from __future__ import annotations
+
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 import joblib
 import numpy as np
 import pandas as pd
 import structlog
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
+from sklearn.pipeline import Pipeline
 from sqlalchemy.orm import Session
 
-from app.core.cache import cache, cached, cache_key_for_prediction
+from app.core.cache import cache, cache_key_for_prediction
 from app.core.config import settings
-from app.core.monitoring import track_prediction, PREDICTION_COUNT, MODEL_LOAD_TIME
+from app.core.monitoring import MODEL_LOAD_TIME, track_prediction
 from app.models.prediction import PredictionModel, PredictionCreate, PredictionUpdate
-from app.schemas.prediction import Prediction
+from app.services.modeling import (
+    DEFAULT_FEATURES,
+    ModelArtifact,
+    load_training_dataframe,
+    prepare_inference_frame,
+    train_model_from_dataframe,
+)
 
 logger = structlog.get_logger(__name__)
 
 
 class PredictionService:
     """Service for handling insurance risk predictions."""
-    
-    def __init__(self):
-        self.model: Optional[RandomForestRegressor] = None
-        self.label_encoders: Dict[str, LabelEncoder] = {}
+
+    def __init__(self) -> None:
+        self.model: Optional[Pipeline] = None
+        self.metadata: Dict[str, Any] = {}
         self.model_version = "v1.0"
-        self.feature_columns = ['age', 'sex', 'bmi', 'children', 'smoker', 'region']
-        
+        self.feature_columns: List[str] = list(DEFAULT_FEATURES)
+
     async def load_model(self) -> bool:
-        """Load the trained model and encoders."""
+        """Load model artefact from cache or disk, training if absent."""
         try:
+            cache_key = f"model:{self.model_version}"
+            cached_payload = cache.get(cache_key)
+            if cached_payload:
+                self._apply_model_payload(cached_payload)
+                logger.info("Model loaded from cache", version=self.model_version)
+                return True
+
             model_path = Path(settings.MODEL_PATH)
-            
             if not model_path.exists():
-                logger.warning("Model file not found, training new model", path=str(model_path))
+                logger.warning("Model file not found, triggering training", path=str(model_path))
                 await self._train_model()
                 return True
-            
-            # Load model from cache first
-            cached_model = cache.get(f"model:{self.model_version}")
-            if cached_model:
-                self.model = cached_model["model"]
-                self.label_encoders = cached_model["encoders"]
-                logger.info("Model loaded from cache")
-                return True
-            
-            # Load from file
+
             with MODEL_LOAD_TIME.time():
                 model_data = joblib.load(model_path)
-                self.model = model_data["model"]
-                self.label_encoders = model_data["encoders"]
-                
-                # Cache the model
-                cache.set(
-                    f"model:{self.model_version}",
-                    {"model": self.model, "encoders": self.label_encoders},
-                    ttl=settings.MODEL_CACHE_TTL
-                )
-            
-            logger.info("Model loaded successfully", path=str(model_path))
+
+            self._apply_model_payload(model_data)
+            cache.set(
+                cache_key,
+                {
+                    "model": self.model,
+                    "metadata": self.metadata,
+                    "feature_columns": self.feature_columns,
+                },
+                ttl=settings.MODEL_CACHE_TTL,
+            )
+            logger.info("Model loaded from disk", path=str(model_path))
             return True
-            
-        except Exception as e:
-            logger.error("Failed to load model", error=str(e))
+
+        except Exception as exc:  # pragma: no cover - defensive logging
+            logger.error("Failed to load model", error=str(exc))
             return False
-    
+
+    def _apply_model_payload(self, payload: Dict[str, Any]) -> None:
+        """Apply a model payload to the service state."""
+        model = payload.get("model")
+        if model is None:
+            raise ValueError("Model payload does not contain a model instance")
+
+        self.model = model
+        self.metadata = payload.get("metadata", {})
+        feature_columns = payload.get("feature_columns")
+        if feature_columns:
+            self.feature_columns = list(feature_columns)
+
     async def _train_model(self) -> None:
-        """Train a new model with synthetic data."""
-        logger.info("Training new model with synthetic data")
-        
-        # Generate synthetic data
-        np.random.seed(42)
-        n_samples = 10000
-        
-        data = {
-            'age': np.random.randint(18, 65, n_samples),
-            'sex': np.random.choice(['male', 'female'], n_samples),
-            'bmi': np.random.normal(25, 5, n_samples).clip(15, 50),
-            'children': np.random.poisson(1, n_samples).clip(0, 5),
-            'smoker': np.random.choice([True, False], n_samples, p=[0.2, 0.8]),
-            'region': np.random.choice(['southwest', 'southeast', 'northwest', 'northeast'], n_samples)
-        }
-        
-        df = pd.DataFrame(data)
-        
-        # Create synthetic charges based on realistic factors
-        base_charge = 5000
-        age_factor = (df['age'] - 18) * 50
-        bmi_factor = np.where(df['bmi'] > 30, (df['bmi'] - 30) * 200, 0)
-        smoker_factor = np.where(df['smoker'], 15000, 0)
-        children_factor = df['children'] * 500
-        
-        df['charges'] = (
-            base_charge + age_factor + bmi_factor + 
-            smoker_factor + children_factor + 
-            np.random.normal(0, 1000, n_samples)
-        ).clip(1000, 50000)
-        
-        # Prepare features
-        X = df[self.feature_columns].copy()
-        y = df['charges']
-        
-        # Encode categorical variables
-        self.label_encoders = {}
-        for col in ['sex', 'region']:
-            le = LabelEncoder()
-            X[col] = le.fit_transform(X[col])
-            self.label_encoders[col] = le
-        
-        # Convert boolean to int
-        X['smoker'] = X['smoker'].astype(int)
-        
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
-        )
-        
-        # Train model
-        self.model = RandomForestRegressor(
-            n_estimators=100,
-            random_state=42,
-            n_jobs=-1
-        )
-        self.model.fit(X_train, y_train)
-        
-        # Save model
+        """Train a new model using the shared modeling pipeline."""
+        logger.info("Training new model artefact", version=self.model_version)
+
+        training_frame = load_training_dataframe()
+        artifact: ModelArtifact = train_model_from_dataframe(training_frame)
+
+        self.model = artifact.model
+        self.metadata = artifact.metadata
+
         model_path = Path(settings.MODEL_PATH)
         model_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        model_data = {
+
+        payload = {
             "model": self.model,
-            "encoders": self.label_encoders,
+            "metadata": self.metadata,
             "version": self.model_version,
-            "feature_columns": self.feature_columns
+            "feature_columns": self.feature_columns,
         }
-        
-        joblib.dump(model_data, model_path)
-        
-        # Cache the model
+        joblib.dump(payload, model_path)
+
         cache.set(
             f"model:{self.model_version}",
-            {"model": self.model, "encoders": self.label_encoders},
-            ttl=settings.MODEL_CACHE_TTL
+            {
+                "model": self.model,
+                "metadata": self.metadata,
+                "feature_columns": self.feature_columns,
+            },
+            ttl=settings.MODEL_CACHE_TTL,
         )
-        
-        logger.info("Model training completed and saved")
-    
+
+        logger.info("Model training completed", path=str(model_path))
+
     @track_prediction()
     async def predict(
         self,
@@ -159,97 +125,146 @@ class PredictionService:
         bmi: float,
         children: int,
         smoker: bool,
-        region: str
+        region: str,
     ) -> Dict[str, Any]:
         """Make a prediction for insurance charges."""
-        
-        # Check cache first
+
         cache_key = cache_key_for_prediction(age, sex, bmi, children, smoker, region)
         cached_result = cache.get(f"prediction:{cache_key}")
         if cached_result:
             logger.debug("Prediction cache hit", cache_key=cache_key)
             return cached_result
-        
-        # Ensure model is loaded
+
         if self.model is None:
             await self.load_model()
-        
+
         if self.model is None:
             raise ValueError("Model not available")
-        
+
         try:
-            # Prepare input data
-            input_data = pd.DataFrame({
-                'age': [age],
-                'sex': [sex],
-                'bmi': [bmi],
-                'children': [children],
-                'smoker': [smoker],
-                'region': [region]
-            })
-            
-            # Encode categorical variables
-            for col in ['sex', 'region']:
-                if col in self.label_encoders:
-                    input_data[col] = self.label_encoders[col].transform(input_data[col])
-                else:
-                    raise ValueError(f"Unknown category for {col}: {input_data[col].iloc[0]}")
-            
-            # Convert boolean to int
-            input_data['smoker'] = input_data['smoker'].astype(int)
-            
-            # Make prediction
-            prediction = self.model.predict(input_data)[0]
-            
-            # Calculate risk score (0-100)
-            risk_score = min(100, max(0, (prediction - 1000) / 500))
-            
-            # Get feature importance for explanation
-            feature_importance = dict(zip(
-                self.feature_columns,
-                self.model.feature_importances_
-            ))
-            
+            input_frame = prepare_inference_frame(
+                pd.DataFrame(
+                    {
+                        "age": [age],
+                        "sex": [sex],
+                        "bmi": [bmi],
+                        "children": [children],
+                        "smoker": [smoker],
+                        "region": [region],
+                    }
+                )
+            )
+
+            self._validate_categories(input_frame.iloc[0])
+
+            prediction = float(self.model.predict(input_frame)[0])
+            risk_score = self._compute_risk_score(prediction)
+            confidence, confidence_interval = self._estimate_confidence(input_frame, prediction)
+
             result = {
-                "predicted_charges": float(prediction),
-                "risk_score": float(risk_score),
-                "feature_importance": feature_importance,
+                "predicted_charges": prediction,
+                "risk_score": risk_score,
+                "feature_importance": self.metadata.get("feature_importance", {}),
                 "model_version": self.model_version,
-                "confidence": 0.85  # Placeholder confidence score
+                "confidence": confidence,
+                "confidence_interval": confidence_interval,
             }
-            
-            # Cache the result
+
             cache.set(
                 f"prediction:{cache_key}",
                 result,
-                ttl=settings.PREDICTION_CACHE_TTL
+                ttl=settings.PREDICTION_CACHE_TTL,
             )
-            
+
             logger.info(
                 "Prediction completed",
                 predicted_charges=prediction,
                 risk_score=risk_score,
-                cache_key=cache_key
+                cache_key=cache_key,
             )
-            
             return result
-            
-        except Exception as e:
-            logger.error("Prediction failed", error=str(e))
-            raise ValueError(f"Prediction failed: {str(e)}")
-    
+
+        except Exception as exc:
+            logger.error("Prediction failed", error=str(exc))
+            raise ValueError(f"Prediction failed: {exc}")
+
+    def _validate_categories(self, row: pd.Series) -> None:
+        """Ensure categorical inputs are part of the trained domain."""
+        categories = self.metadata.get("categorical_levels", {})
+        for field in ("sex", "region"):
+            allowed = categories.get(field)
+            if allowed and row[field] not in allowed:
+                raise ValueError(f"Unknown category for {field}: {row[field]}")
+        if categories.get("smoker") is not None and bool(row["smoker"]) not in categories["smoker"]:
+            raise ValueError(f"Unknown category for smoker: {row['smoker']}")
+
+    def _compute_risk_score(self, prediction: float) -> float:
+        """Map the raw prediction to a 0-100 risk score using quantiles."""
+        quantiles = self.metadata.get("target_quantiles")
+        if quantiles and len(quantiles) >= 2:
+            risk_grid = np.linspace(0, 100, num=len(quantiles))
+            score = float(np.clip(np.interp(prediction, quantiles, risk_grid), 0, 100))
+            return score
+        return float(np.clip((prediction - 1000) / 500, 0, 100))
+
+    def _estimate_confidence(
+        self,
+        input_frame: pd.DataFrame,
+        prediction: float,
+    ) -> Tuple[float, Dict[str, float]]:
+        """Estimate confidence level and interval using ensemble dispersion."""
+        summary = self.metadata.get("target_summary", {})
+        target_std = float(summary.get("std", 1.0))
+
+        prediction_std = None
+        model = self.model
+        if model is not None and hasattr(model, "named_steps"):
+            regressor = model.named_steps.get("regressor")
+            preprocessor = model.named_steps.get("preprocessor")
+        else:  # pragma: no cover - fallback path
+            regressor = None
+            preprocessor = None
+
+        if regressor is not None and hasattr(regressor, "estimators_") and preprocessor is not None:
+            transformed = preprocessor.transform(input_frame)
+            tree_predictions = np.array([est.predict(transformed)[0] for est in regressor.estimators_])
+            prediction_std = float(tree_predictions.std())
+
+        if prediction_std is None:
+            prediction_std = float(target_std * 0.15)
+
+        interval_half = 1.96 * prediction_std
+        confidence_interval = {
+            "lower": float(max(0.0, prediction - interval_half)),
+            "upper": float(max(prediction + interval_half, 0.0)),
+        }
+        confidence = float(np.clip(1 - (prediction_std / (target_std + 1e-6)), 0.2, 0.99))
+
+        return confidence, confidence_interval
+
     def get_model_info(self) -> Dict[str, Any]:
-        """Get information about the current model."""
+        """Return metadata about the loaded model."""
         if self.model is None:
             return {"status": "not_loaded"}
-        
-        return {
+
+        model_type = type(self.model.named_steps.get("regressor", self.model)).__name__ if hasattr(self.model, "named_steps") else type(self.model).__name__
+
+        info: Dict[str, Any] = {
             "status": "loaded",
             "version": self.model_version,
             "feature_columns": self.feature_columns,
-            "model_type": type(self.model).__name__,
-            "n_features": len(self.feature_columns)
+            "model_type": model_type,
+            "n_features": len(self.feature_columns),
         }
+
+        if self.metadata.get("trained_at"):
+            info["trained_at"] = self.metadata["trained_at"]
+        if self.metadata.get("metrics"):
+            info["metrics"] = self.metadata["metrics"]
+        if self.metadata.get("categorical_levels"):
+            info["categorical_levels"] = self.metadata["categorical_levels"]
+
+        return info
 
 
 # Database operations

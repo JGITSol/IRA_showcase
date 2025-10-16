@@ -1,7 +1,6 @@
 import unittest
 import os
 import sys
-import numpy as np
 import pandas as pd
 from pathlib import Path
 
@@ -52,7 +51,7 @@ class TestModel(unittest.TestCase):
         # Test model prediction with sample data
         sample_data = pd.DataFrame({
             'age': [30],
-            'gender': ['male'],
+            'sex': ['male'],
             'bmi': [25.0],
             'children': [2],
             'smoker': ['no'],
@@ -72,7 +71,7 @@ class TestModel(unittest.TestCase):
         # Create two identical input samples
         sample1 = pd.DataFrame({
             'age': [30],
-            'gender': ['male'],
+            'sex': ['male'],
             'bmi': [25.0],
             'children': [2],
             'smoker': ['no'],
@@ -81,7 +80,7 @@ class TestModel(unittest.TestCase):
         
         sample2 = pd.DataFrame({
             'age': [30],
-            'gender': ['male'],
+            'sex': ['male'],
             'bmi': [25.0],
             'children': [2],
             'smoker': ['no'],
@@ -103,7 +102,7 @@ class TestModel(unittest.TestCase):
         # Base case - non-smoker
         non_smoker = pd.DataFrame({
             'age': [30],
-            'gender': ['male'],
+            'sex': ['male'],
             'bmi': [25.0],
             'children': [2],
             'smoker': ['no'],
@@ -113,7 +112,7 @@ class TestModel(unittest.TestCase):
         # Same person but smoker
         smoker = pd.DataFrame({
             'age': [30],
-            'gender': ['male'],
+            'sex': ['male'],
             'bmi': [25.0],
             'children': [2],
             'smoker': ['yes'],

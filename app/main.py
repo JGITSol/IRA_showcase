@@ -1,6 +1,6 @@
 """Main FastAPI application."""
 
-import asyncio
+import inspect
 import time
 from contextlib import asynccontextmanager
 
@@ -9,6 +9,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from sqlalchemy import text
 
 from app.api.v1.api import api_router
 from app.core.config import settings
@@ -22,7 +24,8 @@ from app.core.monitoring import (
 )
 from app.core.rate_limiting import RateLimitMiddleware
 from app.core.cache import cache
-from app.db.session import engine
+from app.db.session import SessionLocal, engine
+from app.services.prediction import PredictionService
 
 logger = structlog.get_logger(__name__)
 
@@ -48,7 +51,9 @@ async def lifespan(app: FastAPI):
     
     # Close database connections
     if engine:
-        await engine.dispose()
+        dispose_result = engine.dispose()
+        if inspect.isawaitable(dispose_result):  # type: ignore[truthy-function]
+            await dispose_result  # type: ignore[misc]
     
     logger.info("Shutdown completed")
 
@@ -59,10 +64,8 @@ def setup_health_checks():
     def database_health():
         """Check database connectivity."""
         try:
-            # Simple database check
-            from app.db.session import SessionLocal
             db = SessionLocal()
-            db.execute("SELECT 1")
+            db.execute(text("SELECT 1"))
             db.close()
             return {"status": "healthy"}
         except Exception as e:
@@ -75,7 +78,6 @@ def setup_health_checks():
     def model_health():
         """Check if model is available."""
         try:
-            from app.services.prediction import PredictionService
             service = PredictionService()
             if service.model is not None:
                 return {"status": "healthy"}
@@ -94,7 +96,6 @@ async def warm_up_cache():
     """Warm up the cache with frequently used data."""
     try:
         # Pre-load model if needed
-        from app.services.prediction import PredictionService
         service = PredictionService()
         await service.load_model()
         logger.info("Model pre-loaded successfully")

@@ -100,7 +100,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             client_ip = request.client.host if request.client else "unknown"
         
         # Include user agent for additional uniqueness
-        user_agent = request.headers.get("User-Agent", "")[:50]  # Limit length
+        user_agent = (request.headers.get("User-Agent") or "")[:50]  # Limit length
         
         return f"{client_ip}:{hash(user_agent)}"
     
@@ -135,11 +135,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
 def rate_limit(requests_per_minute: int = 60, burst: int = 100):
     """Decorator for rate limiting specific endpoints."""
-    limiter = RateLimiter(requests_per_minute, burst)
-    
+
     def decorator(func):
+        limiter_state: Dict[str, Optional[RateLimiter]] = {"instance": None}
+
         @wraps(func)
         async def wrapper(request: Request, *args, **kwargs):
+            limiter_instance = limiter_state["instance"]
+            if limiter_instance is None:
+                limiter_state["instance"] = RateLimiter(requests_per_minute, burst)
+                limiter_instance = limiter_state["instance"]
+
             # Get client identifier
             forwarded_for = request.headers.get("X-Forwarded-For")
             if forwarded_for:
@@ -149,8 +155,8 @@ def rate_limit(requests_per_minute: int = 60, burst: int = 100):
             
             identifier = f"endpoint:{func.__name__}:{client_ip}"
             
-            if not limiter.is_allowed(identifier):
-                retry_after = limiter.get_retry_after(identifier)
+            if not limiter_instance.is_allowed(identifier):
+                retry_after = limiter_instance.get_retry_after(identifier)
                 raise HTTPException(
                     status_code=429,
                     detail=f"Rate limit exceeded for {func.__name__}",

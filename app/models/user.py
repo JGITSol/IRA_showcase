@@ -1,14 +1,11 @@
 """User model and related schemas."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from sqlalchemy import Boolean, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base
-from app.core.security import get_password_hash, verify_password
+from app.db import models as db_models
 
 
 class UserBase(BaseModel):
@@ -72,64 +69,4 @@ class UserInDB(UserInDBBase):
     hashed_password: str = Field(..., description="Hashed password")
 
 
-class UserModel(Base):
-    """SQLAlchemy model for users table."""
-    
-    __tablename__ = "users"
-    
-    email: Mapped[str] = mapped_column(
-        String(255),
-        unique=True,
-        index=True,
-        nullable=False,
-        comment="User's email address (must be unique)"
-    )
-    hashed_password: Mapped[str] = mapped_column(
-        String(255),
-        nullable=False,
-        comment="Hashed password"
-    )
-    full_name: Mapped[Optional[str]] = mapped_column(
-        String(255),
-        nullable=True,
-        comment="User's full name"
-    )
-    is_active: Mapped[bool] = mapped_column(
-        Boolean(),
-        default=True,
-        nullable=False,
-        comment="Whether the user is active"
-    )
-    is_superuser: Mapped[bool] = mapped_column(
-        Boolean(),
-        default=False,
-        nullable=False,
-        comment="Whether the user has superuser privileges"
-    )
-    
-    # Relationships
-    predictions: Mapped[List["PredictionModel"]] = relationship(
-        "PredictionModel",
-        back_populates="user",
-        cascade="all, delete-orphan"
-    )
-    
-    def set_password(self, password: str) -> None:
-        """Set the user's password."""
-        self.hashed_password = get_password_hash(password)
-    
-    def check_password(self, password: str) -> bool:
-        """Check if the provided password matches the stored hash."""
-        return verify_password(password, self.hashed_password)
-    
-    def to_schema(self) -> User:
-        """Convert to Pydantic model for API responses."""
-        return User.model_validate({
-            "id": self.id,
-            "email": self.email,
-            "full_name": self.full_name,
-            "is_active": self.is_active,
-            "is_superuser": self.is_superuser,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-        })
+UserModel = db_models.User

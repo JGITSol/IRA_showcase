@@ -2,9 +2,12 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from pydantic import BaseModel, Field, validator
+
+if TYPE_CHECKING:
+    from app.schemas.user import UserBase
 
 
 class Gender(str, Enum):
@@ -73,7 +76,7 @@ class Prediction(PredictionInDBBase):
 
 class PredictionWithUser(Prediction):
     """Schema for prediction with user information."""
-    
+
     user: 'UserBase'
 
 
@@ -86,5 +89,9 @@ class PredictionList(BaseModel):
     limit: int
 
 
-# Update ForwardRefs
-PredictionWithUser.update_forward_refs()
+try:
+    from app.schemas.user import UserBase
+
+    PredictionWithUser.model_rebuild()
+except ImportError:  # pragma: no cover - circular import guard
+    pass

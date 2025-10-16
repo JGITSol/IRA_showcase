@@ -8,7 +8,7 @@ from jose import jwt
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app import models, schemas
+from app.db import models as db_models
 from app.core.config import settings
 from app.core.security import get_password_hash
 from app.db.session import SessionLocal
@@ -34,7 +34,7 @@ def get_db() -> Generator:
 
 def get_current_user(
     db: Session = Depends(get_db), token: str = Depends(reusable_oauth2)
-) -> models.User:
+) -> db_models.User:
     """Get current user from token.
     
     Args:
@@ -58,15 +58,15 @@ def get_current_user(
             detail="Could not validate credentials",
         )
     
-    user = db.query(models.User).filter(models.User.id == token_data.sub).first()
+    user = db.query(db_models.User).filter(db_models.User.id == token_data.sub).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
 
 def get_current_active_user(
-    current_user: models.User = Depends(get_current_user),
-) -> models.User:
+    current_user: db_models.User = Depends(get_current_user),
+) -> db_models.User:
     """Get current active user.
     
     Args:
@@ -84,8 +84,8 @@ def get_current_active_user(
 
 
 def get_current_active_superuser(
-    current_user: models.User = Depends(get_current_user),
-) -> models.User:
+    current_user: db_models.User = Depends(get_current_user),
+) -> db_models.User:
     """Get current active superuser.
     
     Args:

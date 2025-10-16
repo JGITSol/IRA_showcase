@@ -25,7 +25,7 @@ services:
         condition: service_healthy
     command: >
       bash -c "
-        python -m pip install --no-cache-dir -e '.[dev]' &&
+        mkdir -p /tmp/prometheus &&
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
       "
     healthcheck:

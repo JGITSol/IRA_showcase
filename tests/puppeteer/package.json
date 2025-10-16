@@ -1,0 +1,15 @@
+{
+  "name": "ira-showcase-puppeteer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Headless browser checks and screenshot capture for the IRA Showcase interfaces.",
+  "scripts": {
+    "pretest": "node run-tests.js --setup",
+    "test": "node run-tests.js",
+    "screenshot": "node run-tests.js",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "puppeteer": "^23.7.0"
+  }
+}

@@ -7,8 +7,9 @@ from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from app import models, schemas
+from app.api import deps
 from app.api.deps import get_db
+from app.db import models as db_models
 from app.core.config import settings
 from app.core.security import (
     create_access_token,
@@ -19,7 +20,8 @@ from app.core.security import (
 from app.schemas.msg import Msg
 from app.schemas.token import Token
 from app.schemas.user import User
-from app.utils import send_reset_password_email
+from app.utils.email import send_reset_password_email
+from app.services import auth as auth_service
 
 router = APIRouter()
 
@@ -37,7 +39,7 @@ def login_access_token(
     Returns:
         dict: Access token and token type
     """
-    user = models.User.authenticate(
+    user = auth_service.authenticate_user(
         db, email=form_data.username, password=form_data.password
     )
     if not user:
@@ -61,7 +63,7 @@ def login_access_token(
 
 
 @router.post("/login/test-token", response_model=User)
-def test_token(current_user: models.User = Depends(deps.get_current_user)) -> Any:
+def test_token(current_user: db_models.User = Depends(deps.get_current_user)) -> Any:
     """Test access token.
     
     Args:
@@ -84,7 +86,11 @@ def recover_password(email: str, db: Session = Depends(get_db)) -> Any:
     Returns:
         dict: Message indicating success
     """
-    user = db.query(models.User).filter(models.User.email == email).first()
+    user = (
+        db.query(db_models.User)
+        .filter(db_models.User.email == email)
+        .first()
+    )
     
     if not user:
         # Don't reveal that the user doesn't exist
@@ -124,7 +130,11 @@ def reset_password(
             detail="Invalid token"
         )
     
-    user = db.query(models.User).filter(models.User.email == email).first()
+    user = (
+        db.query(db_models.User)
+        .filter(db_models.User.email == email)
+        .first()
+    )
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

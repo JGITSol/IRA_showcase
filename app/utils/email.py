@@ -5,8 +5,23 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
 
+import structlog
+
 from app.core.config import settings
-from app.core.logging import logger
+
+logger = structlog.get_logger(__name__)
+
+
+EMAILS_ENABLED = bool(getattr(settings, "EMAILS_ENABLED", False))
+EMAIL_FROM = getattr(settings, "EMAILS_FROM_EMAIL", None)
+SMTP_HOST = getattr(settings, "SMTP_HOST", None)
+SMTP_PORT = getattr(settings, "SMTP_PORT", None)
+SMTP_TLS = bool(getattr(settings, "SMTP_TLS", True))
+SMTP_USER = getattr(settings, "SMTP_USER", None)
+SMTP_PASSWORD = getattr(settings, "SMTP_PASSWORD", None)
+EMAIL_RESET_TOKEN_EXPIRE_HOURS = getattr(settings, "EMAIL_RESET_TOKEN_EXPIRE_HOURS", 24)
+ACTIVATION_TOKEN_EXPIRE_HOURS = getattr(settings, "ACTIVATION_TOKEN_EXPIRE_HOURS", 24)
+IS_PRODUCTION = bool(getattr(settings, "PRODUCTION", False))
 
 
 def send_email(
@@ -23,15 +38,19 @@ def send_email(
         html_content: Email HTML content
         text_content: Plain text email content (optional)
     """
-    if not settings.EMAILS_ENABLED:
+    if not EMAILS_ENABLED:
         logger.warning(
             "Email sending is disabled. To enable, set EMAILS_ENABLED=True"
         )
         return
+
+    if not EMAIL_FROM or not SMTP_HOST or not SMTP_PORT:
+        logger.warning("Email configuration incomplete; skipping send.")
+        return
     
     message = MIMEMultipart("alternative")
     message["Subject"] = subject
-    message["From"] = settings.EMAILS_FROM_EMAIL
+    message["From"] = EMAIL_FROM
     message["To"] = email_to
     
     # Attach both HTML and plain text versions
@@ -43,11 +62,11 @@ def send_email(
     message.attach(part2)
     
     try:
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-            if settings.SMTP_TLS:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            if SMTP_TLS:
                 server.starttls()
-            if settings.SMTP_USER and settings.SMTP_PASSWORD:
-                server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            if SMTP_USER and SMTP_PASSWORD:
+                server.login(SMTP_USER, SMTP_PASSWORD)
             server.send_message(message)
         logger.info(f"Email sent to {email_to}")
     except Exception as e:
@@ -75,14 +94,11 @@ def send_reset_password_email(email_to: str, email: str, token: str) -> None:
     <p><a href="{reset_url}">Reset Password</a></p>
     <p>Or copy and paste this link into your browser:</p>
     <p>{reset_url}</p>
-    <p>This link will expire in {settings.EMAIL_RESET_TOKEN_EXPIRE_HOURS} hours.</p>
+    <p>This link will expire in {EMAIL_RESET_TOKEN_EXPIRE_HOURS} hours.</p>
     <p>If you did not request a password reset, please ignore this email.</p>
     <p>Thanks,<br>
     {project_name} Team</p>
-    ""
-    """.format(
-        reset_url=reset_url, project_name=project_name
-    )
+    """
     
     text_content = f"""
     Hello,
@@ -92,13 +108,13 @@ def send_reset_password_email(email_to: str, email: str, token: str) -> None:
     Please click on the following link to reset your password:
     {reset_url}
     
-    This link will expire in {settings.EMAIL_RESET_TOKEN_EXPIRE_HOURS} hours.
+    This link will expire in {EMAIL_RESET_TOKEN_EXPIRE_HOURS} hours.
     
     If you did not request a password reset, please ignore this email.
     
     Thanks,
     {project_name} Team
-    """.format(project_name=project_name)
+    """
     
     send_email(
         email_to=email_to,
@@ -111,16 +127,8 @@ def send_reset_password_email(email_to: str, email: str, token: str) -> None:
     logger.info(f"Password reset URL for {email}: {reset_url}")
     
     # In development, log the token for testing
-    if not settings.PRODUCTION:
+    if not IS_PRODUCTION:
         logger.info(f"Password reset token for {email}: {token}")
-    
-    # In production, use the actual email sending function
-    send_email(
-        email_to=email_to,
-        subject=subject,
-        html_content=html_content,
-        text_content=text_content,
-    )
 
 
 def send_new_account_email(email_to: str, username: str, token: str) -> None:
@@ -145,13 +153,10 @@ def send_new_account_email(email_to: str, username: str, token: str) -> None:
     <p><a href="{activation_url}">Activate Account</a></p>
     <p>Or copy and paste this link into your browser:</p>
     <p>{activation_url}</p>
-    <p>This link will expire in {settings.ACTIVATION_TOKEN_EXPIRE_HOURS} hours.</p>
+    <p>This link will expire in {ACTIVATION_TOKEN_EXPIRE_HOURS} hours.</p>
     <p>Thanks,<br>
     {project_name} Team</p>
-    ""
-    """.format(
-        username=username, activation_url=activation_url, project_name=project_name
-    )
+    """
     
     text_content = f"""
     Hello {username},
@@ -163,11 +168,11 @@ def send_new_account_email(email_to: str, username: str, token: str) -> None:
     Please click on the following link to activate your account:
     {activation_url}
     
-    This link will expire in {settings.ACTIVATION_TOKEN_EXPIRE_HOURS} hours.
+    This link will expire in {ACTIVATION_TOKEN_EXPIRE_HOURS} hours.
     
     Thanks,
     {project_name} Team
-    """.format(username=username, project_name=project_name)
+    """
     
     send_email(
         email_to=email_to,

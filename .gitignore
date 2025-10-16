@@ -3,3 +3,44 @@ venv
 .sql
 .pyc
 .venv
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.ipynb_checkpoints/
+
+# Editors/IDE
+.vscode/
+.idea/
+
+# Environments
+.env.*
+env/
+.envrc
+
+# Logs & temp
+logs/
+*.log
+tmp/
+
+# Node/Puppeteer
+tests/puppeteer/node_modules/
+tests/puppeteer/output/
+
+# Build/Dist
+build/
+dist/
+site/
+
+# Docker
+.docker/
+
+# OS
+.DS_Store
+Thumbs.db

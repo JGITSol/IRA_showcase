@@ -1,3 +1,5 @@
+from typing import Optional
+
 import streamlit as st
 import re  # For hex validation
 
@@ -22,6 +24,7 @@ DEFAULT_DARK_THEME = {
 LIGHT_PALETTE = {
     'primary': '#FF4B4B',
     'background': '#FFFFFF',
+    'secondary': '#F8F9FB',
     'secondary_background': '#F0F2F6',
     'text': '#262730',
     'grid': '#DDDDDD',
@@ -35,6 +38,7 @@ LIGHT_PALETTE = {
 DARK_PALETTE = {
     'primary': '#FF4B4B',
     'background': '#0E1117',
+    'secondary': '#1A1F29',
     'secondary_background': '#262730',
     'text': '#FAFAFA',
     'grid': '#444444',
@@ -46,42 +50,30 @@ DARK_PALETTE = {
 }
 
 
-def get_streamlit_theme() -> str:
-    """
-    Detects the current Streamlit theme (light or dark).
+def get_streamlit_theme_config() -> str:
+    """Return the active Streamlit theme name ("light" or "dark")."""
 
-    Tries to use `st.get_option("theme.base")` first. If that fails (e.g., due to
-    an older Streamlit version or if not in a Streamlit context), it falls back to 
-    `st.config.get_option("theme.base")`. If both methods fail, it defaults to "light".
-
-    Returns:
-        str: The detected theme, either "dark" or "light".
-    """
-    try:
-        # Recommended way for Streamlit 1.18.0+
-        theme_config = st.get_option("theme.base")
-        if theme_config == "dark":
-            return "dark"
-        else:
-            # Covers 'light' and any other non-dark themes
-            return "light"
-    except AttributeError:
-        # Fallback for older Streamlit versions or if st.get_option is not available
+    for accessor in (getattr(st, "get_option", None), getattr(getattr(st, "config", None), "get_option", None)):
+        if accessor is None:
+            continue
         try:
-            theme_config = st.config.get_option("theme.base")
-            if theme_config == "dark":
-                return "dark"
-            else:
-                return "light"
+            base_theme = accessor("theme.base")
         except Exception:
-            # Final fallback if all methods fail (e.g. not in streamlit context)
-            return "light" 
-    except Exception:
-        # Catch any other unexpected errors during theme detection
-        return "light"  # Default to light theme as a safe fallback
+            continue
+        if isinstance(base_theme, str) and base_theme.lower() == "dark":
+            return "dark"
+        if base_theme:
+            return "light"
+
+    return "light"
 
 
-def get_color_palette(theme: str = None) -> dict:
+def get_streamlit_theme() -> str:
+    """Backward-compatible alias for theme detection."""
+    return get_streamlit_theme_config()
+
+
+def get_color_palette(theme: Optional[str] = None) -> dict:
     """
     Returns a color palette dictionary based on the current Streamlit theme.
 
@@ -92,7 +84,7 @@ def get_color_palette(theme: str = None) -> dict:
         dict: A dictionary of color mappings
     """
     if theme is None:
-        theme = get_streamlit_theme()
+        theme = get_streamlit_theme_config()
     
     if theme == "dark":
         return DARK_PALETTE
@@ -130,7 +122,7 @@ def hex_to_rgba(hex_color: str, alpha: float) -> str:
     return f"rgba({r},{g},{b},{alpha})"
 
 
-def get_color(color_name: str, theme: str = None) -> str:
+def get_color(color_name: str, theme: Optional[str] = None) -> str:
     """
     Get a specific color from the current theme's palette.
     

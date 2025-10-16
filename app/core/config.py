@@ -99,7 +99,7 @@ class Settings(BaseSettings):
             password=self.DB_PASSWORD,
             host=self.DB_HOST,
             port=self.DB_PORT,
-            path=f"/{self.DB_NAME}",
+            path=self.DB_NAME,
         ))
     
     @field_validator("SQLALCHEMY_DATABASE_URI", mode='before')
@@ -120,7 +120,7 @@ class Settings(BaseSettings):
             password=values.get("DB_PASSWORD"),
             host=values.get("DB_HOST"),
             port=values.get("DB_PORT", 5432),
-            path=f"/{values.get('DB_NAME') or ''}",
+            path=values.get('DB_NAME') or None,
         ))
     
     # Redis/Caching

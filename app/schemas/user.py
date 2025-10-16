@@ -1,11 +1,12 @@
 """Pydantic models for user-related schemas."""
 
 from datetime import datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from pydantic import BaseModel, EmailStr, Field, validator
 
-from app.schemas.prediction import Prediction
+if TYPE_CHECKING:
+    from app.schemas.prediction import Prediction
 
 
 class UserBase(BaseModel):
@@ -70,8 +71,8 @@ class UserInDB(UserInDBBase):
 
 class UserWithPredictions(User):
     """Schema for user with their predictions."""
-    
-    predictions: List[Prediction] = []
+
+    predictions: List['Prediction'] = []
 
 
 class UserList(BaseModel):
@@ -83,5 +84,10 @@ class UserList(BaseModel):
     limit: int
 
 
-# Update ForwardRefs
-UserWithPredictions.update_forward_refs()
+# Update ForwardRefs for Pydantic v2
+try:
+    from app.schemas.prediction import Prediction
+
+    UserWithPredictions.model_rebuild()
+except ImportError:  # pragma: no cover - circular import guard
+    pass

@@ -23,11 +23,6 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-[project.urls]
-Homepage = "https://github.com/yourusername/insurance-risk-analyzer"
-Documentation = "https://github.com/yourusername/insurance-risk-analyzer#readme"
-Issues = "https://github.com/yourusername/insurance-risk-analyzer/issues"
-
 dependencies = [
     # Core web framework
     "fastapi>=0.104.1",
@@ -35,19 +30,19 @@ dependencies = [
     "pydantic>=2.4.2",
     "pydantic-settings>=2.0.3",
     "python-multipart>=0.0.6",
-    
+
     # Database
     "sqlalchemy>=2.0.21",
     "alembic>=1.12.1",
     "psycopg2-binary>=2.9.9",  # For PostgreSQL
     "aiosqlite>=0.19.0",  # For SQLite
-    
+
     # Authentication & Security
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
     "python-dotenv>=1.0.0",
     "email-validator>=2.1.0",
-    
+
     # Data processing
     "pandas>=2.1.0",
     "numpy>=1.26.0",
@@ -55,20 +50,25 @@ dependencies = [
     "xgboost>=2.0.0",
     "lightgbm>=4.0.0",
     "shap>=0.43.0",
-    
+
     # ML Ops
     "mlflow>=2.7.1",
     "prometheus-client>=0.18.0",
     "opentelemetry-sdk>=1.20.0",
     "opentelemetry-instrumentation-fastapi>=0.41b0",
     "python-json-logger>=2.0.7",
-    
+
     # Utilities
     "python-dateutil>=2.8.2",
     "pytz>=2023.3",
     "typing-extensions>=4.8.0",
     "loguru>=0.7.2",  # Enhanced logging
 ]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/insurance-risk-analyzer"
+Documentation = "https://github.com/yourusername/insurance-risk-analyzer#readme"
+Issues = "https://github.com/yourusername/insurance-risk-analyzer/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -132,6 +132,14 @@ docs = [
     "mkdocs>=1.4.0",
     "mkdocs-material>=9.1.0",
     "mkdocstrings[python]>=0.20.0",
+]
+
+ui = [
+    # Streamlit UI stack
+    "streamlit>=1.32.0",
+    "plotly>=5.20.0",
+    "seaborn>=0.13.0",
+    "matplotlib>=3.8.0",
 ]
 
 [project.scripts]

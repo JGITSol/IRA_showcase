@@ -1,12 +1,21 @@
 """Security utilities for authentication and authorization."""
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, Union
+from typing import Any, Optional, Union, cast
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from app.core.config import settings
+
+
+def generate_password_reset_token(email: str) -> str:
+    """Backward-compatible helper that wraps ``create_password_reset_token``.
+
+    Some modules still import :func:`generate_password_reset_token`; keep the
+    thin wrapper so they continue to work without refactors.
+    """
+    return create_password_reset_token(email)
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -139,7 +148,7 @@ def verify_password_reset_token(token: str) -> Optional[str]:
         decoded_token = decode_token(token)
         if decoded_token is None:
             return None
-        email: str = decoded_token.get("sub")
+        email = cast(Optional[str], decoded_token.get("sub"))
         return email
     except JWTError:
         return None

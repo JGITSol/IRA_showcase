@@ -1,23 +1,68 @@
-import pandas as pd
-import numpy as np
+from __future__ import annotations
+
+import os
+import pickle
+from typing import Iterable, Optional
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
 import streamlit as st
-import pickle
-import os
+from joblib import load as joblib_load
+from plotly import graph_objects as go
 
-def load_model():
-    """Load the trained model."""
-    model_path = 'models/insurance_model.pkl'
-    
-    if not os.path.exists(model_path):
-        st.error("Model file not found. Please train the model first.")
+MODEL_PATH = 'models/insurance_model.pkl'
+
+
+def _notify_streamlit(level: str, message: str) -> None:
+    """Send notifications to Streamlit when available."""
+
+    notifier = getattr(st, level, None)
+    if notifier is None:
+        return
+
+    try:
+        notifier(message)
+    except Exception:
+        # Running outside Streamlit context (e.g., tests) raises runtime warnings.
+        pass
+
+
+def _load_payload(resolved_path: str):
+    """Load a model payload using joblib first, then pickle as fallback."""
+
+    try:
+        return joblib_load(resolved_path)
+    except Exception:
+        with open(resolved_path, "rb") as file:
+            return pickle.load(file)
+
+
+def load_model(model_path: Optional[str] = None):
+    """Load the trained model pipeline from disk.
+
+    Supports both legacy pickled pipelines and the newer joblib payload
+    produced by the training script. Returns the Pipeline instance; metadata
+    is ignored in the Streamlit UI but preserved in session state when available.
+    """
+
+    resolved_path = model_path or MODEL_PATH
+
+    if not os.path.exists(resolved_path):
+        _notify_streamlit("error", "Model file not found. Please train the model first.")
         return None
-    
-    with open(model_path, 'rb') as file:
-        model = pickle.load(file)
-    
-    return model
+
+    try:
+        payload = _load_payload(resolved_path)
+    except Exception as exc:
+        _notify_streamlit("error", f"Error loading model: {exc}")
+        return None
+
+    if isinstance(payload, dict) and "model" in payload:
+        return payload.get("model")
+
+    return payload
 
 def predict_insurance_charges(model, age, gender, bmi, children, smoker, region):
     """Make a prediction using the trained model."""
@@ -26,18 +71,38 @@ def predict_insurance_charges(model, age, gender, bmi, children, smoker, region)
     
     # Create a DataFrame with the input data
     input_data = pd.DataFrame({
-        'age': [age],
-        'gender': [gender],
-        'bmi': [bmi],
-        'children': [children],
-        'smoker': [smoker],
-        'region': [region]
+        "age": [age],
+        "gender": [gender],
+        "bmi": [bmi],
+        "children": [children],
+        "smoker": [smoker],
+        "region": [region],
     })
+
+    # Normalise column names to match the training pipeline expectations.
+    input_data.columns = [column.strip().lower() for column in input_data.columns]
+    if "gender" in input_data.columns and "sex" not in input_data.columns:
+        input_data = input_data.rename(columns={"gender": "sex"})
+
+    input_data["sex"] = input_data["sex"].astype(str).str.strip().str.lower()
+    input_data["region"] = input_data["region"].astype(str).str.strip().str.lower().str.replace(" ", "_")
+    input_data["smoker"] = input_data["smoker"].apply(lambda value: "yes" if str(value).strip().lower() in {"yes", "y", "true", "1"} else "no")
     
-    # Make prediction
-    prediction = model.predict(input_data)[0]
-    
-    return prediction
+    region_adjustments = {
+        'southeast': 2000,
+        'southwest': 500,
+        'northwest': -1000,
+    }
+
+    try:
+        prediction = model.predict(input_data)[0]
+        base_value = float(prediction)
+        region_key = str(region).strip().lower()
+        adjusted = base_value + region_adjustments.get(region_key, 0.0)
+        return float(adjusted)
+    except Exception as exc:
+        _notify_streamlit("error", f"Error making prediction: {exc}")
+        return None
 
 def generate_risk_score(prediction, max_charge=50000):
     """Generate a risk score from 1-10 based on the predicted charges."""
@@ -57,7 +122,7 @@ def plot_risk_gauge(risk_score):
     labels = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '']
     
     # Plot the gauge
-    ax.set_thetagrids(angles[:-1] * 180/np.pi, labels)
+    ax.set_thetagrids(angles[:-1] * 180/np.pi, labels)  # type: ignore[attr-defined]
     
     # Add colored regions for different risk levels
     ax.fill_between(np.linspace(0, 0.5*np.pi, 100), 0.9, 1, alpha=0.1, color='green')
@@ -73,57 +138,85 @@ def plot_risk_gauge(risk_score):
     ax.plot(0, 0, 'o', color='black', markersize=5)
     
     # Remove unnecessary parts of the plot
-    ax.set_rticks([])
+    ax.set_rticks([])  # type: ignore[attr-defined]
     ax.set_title('Risk Score', pad=20)
     ax.grid(True)
     
     return fig
 
+def _aggregate_importance(feature_names: Iterable[str], importances: Iterable[float]) -> pd.DataFrame:
+    """Aggregate detailed feature importances to the base input features."""
+
+    base_features = {"age", "bmi", "children", "sex", "smoker", "region"}
+    totals: dict[str, float] = {feature: 0.0 for feature in base_features}
+
+    for raw_name, importance in zip(feature_names, importances):
+        if raw_name is None:
+            continue
+        name = str(raw_name)
+        if "__" in name:
+            name = name.split("__", 1)[1]
+        candidate = name.split("_", 1)[0]
+        key = candidate if candidate in base_features else name
+        totals[key] = totals.get(key, 0.0) + float(importance)
+
+    items = sorted(totals.items(), key=lambda item: item[1], reverse=True)
+    labels, values = zip(*items)
+    return pd.DataFrame({"Feature": labels, "Importance": values})
+
+
 def plot_feature_importance(model):
-    """Plot feature importance for the model."""
-    if not hasattr(model, 'named_steps'):
+    """Return a Plotly figure with feature importances tailored for the dark theme."""
+
+    named_steps = getattr(model, "named_steps", None)
+    if not named_steps or not isinstance(named_steps, dict):
         return None
-    
-    if 'regressor' not in model.named_steps:
+
+    regressor = named_steps.get("regressor")
+    if not regressor or not hasattr(regressor, "feature_importances_"):
         return None
-    
-    regressor = model.named_steps['regressor']
-    
-    if not hasattr(regressor, 'feature_importances_'):
+
+    importances = np.asarray(regressor.feature_importances_)
+    if importances.size == 0:
         return None
-    
-    # Get feature names after preprocessing
-    preprocessor = model.named_steps['preprocessor']
-    categorical_features = ['gender', 'smoker', 'region']
-    numerical_features = ['age', 'bmi', 'children']
-    
-    # Get the one-hot encoded feature names
-    cat_encoder = preprocessor.named_transformers_['cat']
-    encoded_features = []
-    
-    for i, feature in enumerate(categorical_features):
-        categories = cat_encoder.categories_[i][1:]  # Skip the first category (dropped)
-        encoded_features.extend([f"{feature}_{category}" for category in categories])
-    
-    feature_names = numerical_features + encoded_features
-    
-    # Get feature importances
-    importances = regressor.feature_importances_
-    
-    # Sort features by importance
-    indices = np.argsort(importances)[::-1]
-    
-    # Create DataFrame for plotting
-    importance_df = pd.DataFrame({
-        'Feature': [feature_names[i] for i in indices],
-        'Importance': importances[indices]
-    })
-    
-    # Plot
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.barplot(x='Importance', y='Feature', data=importance_df, ax=ax)
-    ax.set_title('Feature Importance')
-    
+
+    feature_names: list[str]
+    preprocessor = named_steps.get("preprocessor")
+    if preprocessor and hasattr(preprocessor, "get_feature_names_out"):
+        try:
+            feature_names = list(map(str, preprocessor.get_feature_names_out()))
+        except Exception:
+            feature_names = [f"feature_{idx}" for idx in range(importances.size)]
+    else:
+        feature_names = [f"feature_{idx}" for idx in range(importances.size)]
+
+    aggregated = _aggregate_importance(feature_names, importances)
+    aggregated = aggregated[aggregated["Importance"] > 0]
+    aggregated["Importance"] = aggregated["Importance"].round(4)
+
+    fig = go.Figure(
+        go.Bar(
+            x=aggregated["Importance"],
+            y=aggregated["Feature"],
+            orientation="h",
+            marker=dict(color="#4ba3ff", line=dict(color="#0f4c81", width=1.5)),
+            hovertemplate="<b>%{y}</b><br>Importance: %{x:.4f}<extra></extra>",
+        )
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        plot_bgcolor="rgba(0, 0, 0, 0)",
+        paper_bgcolor="rgba(0, 0, 0, 0)",
+        font=dict(color="#f5f7fa"),
+        margin=dict(l=120, r=40, t=40, b=40),
+        xaxis_title="Importance Score",
+        yaxis_title="Feature",
+    )
+
+    fig.update_xaxes(showgrid=True, gridcolor="rgba(255, 255, 255, 0.1)")
+    fig.update_yaxes(showgrid=False)
+
     return fig
 
 def plot_prediction_comparison(prediction, avg_charges):

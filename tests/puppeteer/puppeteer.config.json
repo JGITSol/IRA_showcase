@@ -1,0 +1,31 @@
+{
+  "baseUrl": "http://localhost:8000",
+  "outputDir": "./output",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "waitUntil": "networkidle2",
+  "timeout": 30000,
+  "selectorTimeout": 15000,
+  "routes": [
+    {
+      "name": "api-docs",
+      "path": "/docs",
+      "waitForSelector": "#swagger-ui",
+      "screenshot": true
+    },
+    {
+      "name": "api-health",
+      "path": "/health",
+      "expectStatus": 200,
+      "screenshot": false
+    },
+    {
+      "name": "streamlit-dashboard",
+      "url": "http://localhost:8501/",
+      "waitForSelector": "div[data-testid=\"stAppViewContainer\"]",
+      "screenshot": true
+    }
+  ]
+}

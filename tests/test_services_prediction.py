@@ -1,11 +1,39 @@
 """Tests for prediction service."""
 
-import pytest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+
 import numpy as np
 import pandas as pd
-from unittest.mock import Mock, patch, MagicMock
+import pytest
 
 from app.services.prediction import PredictionService, prediction_service
+
+
+def _default_metadata() -> dict:
+    """Construct representative metadata payload for tests."""
+    return {
+        "trained_at": "2024-01-01T00:00:00",
+        "target_summary": {"std": 2500.0, "mean": 18000.0},
+        "target_quantiles": [float(x) for x in np.linspace(2000, 60000, 101)],
+        "feature_importance": {
+            "age": 0.3,
+            "sex": 0.05,
+            "bmi": 0.25,
+            "children": 0.1,
+            "smoker": 0.2,
+            "region": 0.1,
+        },
+        "categorical_levels": {
+            "sex": ["female", "male"],
+            "region": ["northeast", "northwest", "southeast", "southwest"],
+            "smoker": [False, True],
+        },
+        "metrics": {
+            "train": {"r2": 0.95, "mae": 1050.0, "rmse": 1800.0},
+            "test": {"r2": 0.88, "mae": 1600.0, "rmse": 2400.0},
+        },
+    }
 
 
 class TestPredictionService:
@@ -17,83 +45,73 @@ class TestPredictionService:
         return PredictionService()
     
     @pytest.fixture
-    def mock_model(self):
-        """Create a mock ML model."""
-        model = Mock()
-        model.predict.return_value = np.array([15000.0])
-        model.feature_importances_ = np.array([0.3, 0.2, 0.15, 0.15, 0.1, 0.1])
-        return model
-    
-    @pytest.fixture
-    def mock_encoders(self):
-        """Create mock label encoders."""
-        sex_encoder = Mock()
-        sex_encoder.transform.return_value = np.array([0])  # male = 0
-        
-        region_encoder = Mock()
-        region_encoder.transform.return_value = np.array([0])  # northeast = 0
-        
-        return {
-            'sex': sex_encoder,
-            'region': region_encoder
-        }
+    def mock_pipeline(self):
+        """Create a mock pipeline with predictable behaviour."""
+        preprocessor = Mock()
+        preprocessor.transform.return_value = np.array([[0.1, 0.2, 0.3]])
+
+        regressor = Mock()
+        estimators = [Mock(), Mock(), Mock()]
+        outputs = [np.array([14500.0]), np.array([15000.0]), np.array([15500.0])]
+        for estimator, output in zip(estimators, outputs):
+            estimator.predict.return_value = output
+        regressor.estimators_ = estimators
+
+        pipeline = Mock()
+        pipeline.predict.return_value = np.array([15000.0])
+        pipeline.named_steps = {"preprocessor": preprocessor, "regressor": regressor}
+        return pipeline
     
     def test_init(self, service):
         """Test service initialization."""
         assert service.model is None
-        assert service.label_encoders == {}
+        assert service.metadata == {}
         assert service.model_version == "v1.0"
         assert service.feature_columns == ['age', 'sex', 'bmi', 'children', 'smoker', 'region']
     
     @pytest.mark.asyncio
-    async def test_load_model_from_cache(self, service):
+    async def test_load_model_from_cache(self, service, mock_pipeline):
         """Test loading model from cache."""
-        mock_model = Mock()
-        mock_encoders = {'sex': Mock(), 'region': Mock()}
-        
+        metadata = _default_metadata()
+        payload = {
+            'model': mock_pipeline,
+            'metadata': metadata,
+            'feature_columns': service.feature_columns,
+        }
+
         with patch('app.services.prediction.cache') as mock_cache:
-            mock_cache.get.return_value = {
-                'model': mock_model,
-                'encoders': mock_encoders
-            }
-            
+            mock_cache.get.return_value = payload
+
             result = await service.load_model()
-            
+
             assert result is True
-            assert service.model == mock_model
-            assert service.label_encoders == mock_encoders
+            assert service.model == mock_pipeline
+            assert service.metadata == metadata
             mock_cache.get.assert_called_once_with(f"model:{service.model_version}")
     
     @pytest.mark.asyncio
-    async def test_load_model_from_file(self, service):
+    async def test_load_model_from_file(self, service, mock_pipeline):
         """Test loading model from file."""
-        mock_model = Mock()
-        mock_encoders = {'sex': Mock(), 'region': Mock()}
+        metadata = _default_metadata()
         model_data = {
-            'model': mock_model,
-            'encoders': mock_encoders
+            'model': mock_pipeline,
+            'metadata': metadata,
+            'feature_columns': service.feature_columns,
         }
-        
+
         with patch('app.services.prediction.cache') as mock_cache, \
              patch('app.services.prediction.Path') as mock_path, \
              patch('app.services.prediction.joblib') as mock_joblib:
-            
-            # Cache miss
+
             mock_cache.get.return_value = None
-            
-            # File exists
             mock_path.return_value.exists.return_value = True
-            
-            # Load from file
             mock_joblib.load.return_value = model_data
-            
+
             result = await service.load_model()
-            
+
             assert result is True
-            assert service.model == mock_model
-            assert service.label_encoders == mock_encoders
-            
-            # Verify caching
+            assert service.model == mock_pipeline
+            assert service.metadata == metadata
             mock_cache.set.assert_called_once()
     
     @pytest.mark.asyncio
@@ -115,57 +133,52 @@ class TestPredictionService:
             mock_train.assert_called_once()
     
     @pytest.mark.asyncio
-    async def test_train_model(self, service):
+    async def test_train_model(self, service, mock_pipeline):
         """Test model training."""
-        mock_model = Mock()
-        mock_model.fit.return_value = None
-        
-        with patch('app.services.prediction.RandomForestRegressor') as mock_rf, \
-             patch('app.services.prediction.LabelEncoder') as mock_le, \
+        metadata = _default_metadata()
+        artifact = SimpleNamespace(model=mock_pipeline, metadata=metadata)
+
+        with patch('app.services.prediction.load_training_dataframe') as mock_load, \
+             patch('app.services.prediction.train_model_from_dataframe') as mock_train, \
              patch('app.services.prediction.joblib') as mock_joblib, \
              patch('app.services.prediction.cache') as mock_cache, \
              patch('app.services.prediction.Path') as mock_path:
-            
-            mock_rf.return_value = mock_model
-            mock_le.return_value.fit_transform.return_value = np.array([0, 1])
+
+            mock_load.return_value = pd.DataFrame()
+            mock_train.return_value = artifact
             mock_path.return_value.parent.mkdir = Mock()
-            
+
             await service._train_model()
-            
-            assert service.model == mock_model
-            assert 'sex' in service.label_encoders
-            assert 'region' in service.label_encoders
-            
-            # Verify model was saved
+
+            assert service.model == mock_pipeline
+            assert service.metadata == metadata
             mock_joblib.dump.assert_called_once()
             mock_cache.set.assert_called_once()
     
     @pytest.mark.asyncio
-    async def test_predict_success(self, service, mock_model, mock_encoders):
+    async def test_predict_success(self, service, mock_pipeline):
         """Test successful prediction."""
-        service.model = mock_model
-        service.label_encoders = mock_encoders
-        
+        service.model = mock_pipeline
+        service.metadata = _default_metadata()
+
         with patch('app.services.prediction.cache') as mock_cache:
-            # Cache miss
             mock_cache.get.return_value = None
-            
+
             result = await service.predict(
-                age=30,
+                age=40,
                 sex="male",
-                bmi=25.0,
+                bmi=28.5,
                 children=2,
                 smoker=False,
                 region="northeast"
             )
-            
-            assert result["predicted_charges"] == 15000.0
-            assert "risk_score" in result
-            assert "feature_importance" in result
-            assert result["model_version"] == "v1.0"
-            assert "confidence" in result
-            
-            # Verify caching
+
+            assert pytest.approx(result["predicted_charges"], rel=1e-6) == 15000.0
+            assert 0 <= result["risk_score"] <= 100
+            assert 0 <= result["confidence"] <= 1
+            assert "confidence_interval" in result
+            assert result["confidence_interval"]["lower"] <= result["predicted_charges"] <= result["confidence_interval"]["upper"]
+            assert result["feature_importance"] == service.metadata["feature_importance"]
             mock_cache.set.assert_called_once()
     
     @pytest.mark.asyncio
@@ -173,10 +186,11 @@ class TestPredictionService:
         """Test prediction with cache hit."""
         cached_result = {
             "predicted_charges": 12000.0,
-            "risk_score": 4.0,
+            "risk_score": 35.0,
             "feature_importance": {},
             "model_version": "v1.0",
-            "confidence": 0.85
+            "confidence": 0.9,
+            "confidence_interval": {"lower": 10000.0, "upper": 14000.0},
         }
         
         with patch('app.services.prediction.cache') as mock_cache:
@@ -211,21 +225,18 @@ class TestPredictionService:
                 )
     
     @pytest.mark.asyncio
-    async def test_predict_invalid_category(self, service, mock_model):
+    async def test_predict_invalid_category(self, service, mock_pipeline):
         """Test prediction with invalid category."""
-        service.model = mock_model
-        service.label_encoders = {'sex': Mock(), 'region': Mock()}
-        
-        # Make encoder raise ValueError for unknown category
-        service.label_encoders['sex'].transform.side_effect = ValueError("Unknown category")
-        
+        service.model = mock_pipeline
+        service.metadata = _default_metadata()
+
         with patch('app.services.prediction.cache') as mock_cache:
             mock_cache.get.return_value = None
-            
-            with pytest.raises(ValueError, match="Unknown category"):
+
+            with pytest.raises(ValueError, match="Unknown category for sex"):
                 await service.predict(
                     age=30,
-                    sex="invalid_sex",
+                    sex="invalid",
                     bmi=25.0,
                     children=2,
                     smoker=False,
@@ -237,14 +248,21 @@ class TestPredictionService:
         result = service.get_model_info()
         assert result["status"] == "not_loaded"
     
-    def test_get_model_info_loaded(self, service, mock_model):
+    def test_get_model_info_loaded(self, service, mock_pipeline):
         """Test getting model info when model is loaded."""
-        service.model = mock_model
-        
+        service.model = mock_pipeline
+        service.metadata = _default_metadata()
+
         result = service.get_model_info()
-        
+
         assert result["status"] == "loaded"
         assert result["version"] == "v1.0"
         assert result["feature_columns"] == service.feature_columns
-        assert "model_type" in result
+        assert result["metrics"] == service.metadata["metrics"]
+        assert result["categorical_levels"] == service.metadata["categorical_levels"]
         assert result["n_features"] == len(service.feature_columns)
+
+
+def test_prediction_service_singleton() -> None:
+    """Ensure the module-level prediction service is instantiated."""
+    assert isinstance(prediction_service, PredictionService)

@@ -48,6 +48,34 @@ services:
       retries: 3
       start_period: 10s
 
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        POETRY_WITH: ui
+    command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      db:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   db:
     image: postgres:15-alpine
     container_name: postgres_db

@@ -5,8 +5,8 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app import models, schemas
 from app.api.deps import get_current_active_user, get_db
+from app.db import models as db_models
 from app.schemas.prediction import Prediction, PredictionCreate, PredictionUpdate
 from app.services import prediction as prediction_service
 
@@ -18,7 +18,7 @@ def create_prediction(
     *,
     db: Session = Depends(get_db),
     prediction_in: PredictionCreate,
-    current_user: models.User = Depends(get_current_active_user),
+    current_user: db_models.User = Depends(get_current_active_user),
 ) -> Any:
     """Create new prediction.
     
@@ -41,7 +41,7 @@ def read_predictions(
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
-    current_user: models.User = Depends(get_current_active_user),
+    current_user: db_models.User = Depends(get_current_active_user),
 ) -> Any:
     """Retrieve predictions for the current user.
     
@@ -64,7 +64,7 @@ def read_predictions(
 def read_prediction(
     prediction_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),
+    current_user: db_models.User = Depends(get_current_active_user),
 ) -> Any:
     """Get prediction by ID.
     
@@ -95,7 +95,7 @@ def update_prediction(
     prediction_id: int,
     prediction_in: PredictionUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),
+    current_user: db_models.User = Depends(get_current_active_user),
 ) -> Any:
     """Update a prediction.
     
@@ -129,7 +129,7 @@ def update_prediction(
 def delete_prediction(
     prediction_id: int,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_active_user),
+    current_user: db_models.User = Depends(get_current_active_user),
 ) -> Any:
     """Delete a prediction.
     

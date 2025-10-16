@@ -5,8 +5,8 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app import models, schemas
 from app.api.deps import get_current_active_superuser, get_current_user, get_db
+from app.db import models as db_models
 from app.core.security import get_password_hash
 from app.schemas.user import User, UserCreate, UserUpdate
 
@@ -18,7 +18,7 @@ def read_users(
     db: Session = Depends(get_db),
     skip: int = 0,
     limit: int = 100,
-    current_user: models.User = Depends(get_current_active_superuser),
+    current_user: db_models.User = Depends(get_current_active_superuser),
 ) -> Any:
     """Retrieve users (admin only).
     
@@ -31,7 +31,7 @@ def read_users(
     Returns:
         List[User]: List of users
     """
-    users = db.query(models.User).offset(skip).limit(limit).all()
+    users = db.query(db_models.User).offset(skip).limit(limit).all()
     return users
 
 
@@ -40,7 +40,7 @@ def create_user(
     *,
     db: Session = Depends(get_db),
     user_in: UserCreate,
-    current_user: models.User = Depends(get_current_active_superuser),
+    current_user: db_models.User = Depends(get_current_active_superuser),
 ) -> Any:
     """Create new user (admin only).
     
@@ -55,7 +55,11 @@ def create_user(
     Raises:
         HTTPException: If user with email already exists
     """
-    user = db.query(models.User).filter(models.User.email == user_in.email).first()
+    user = (
+        db.query(db_models.User)
+        .filter(db_models.User.email == user_in.email)
+        .first()
+    )
     if user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -63,7 +67,7 @@ def create_user(
         )
     
     hashed_password = get_password_hash(user_in.password)
-    db_user = models.User(
+    db_user = db_models.User(
         email=user_in.email,
         hashed_password=hashed_password,
         full_name=user_in.full_name,
@@ -77,7 +81,7 @@ def create_user(
 
 @router.get("/me", response_model=User)
 def read_user_me(
-    current_user: models.User = Depends(get_current_user),
+    current_user: db_models.User = Depends(get_current_user),
 ) -> Any:
     """Get current user.
     
@@ -95,7 +99,7 @@ def update_user_me(
     *,
     db: Session = Depends(get_db),
     user_in: UserUpdate,
-    current_user: models.User = Depends(get_current_user),
+    current_user: db_models.User = Depends(get_current_user),
 ) -> Any:
     """Update own user.
     
@@ -126,7 +130,7 @@ def update_user_me(
 @router.get("/{user_id}", response_model=User)
 def read_user_by_id(
     user_id: int,
-    current_user: models.User = Depends(get_current_active_superuser),
+    current_user: db_models.User = Depends(get_current_active_superuser),
     db: Session = Depends(get_db),
 ) -> Any:
     """Get a specific user by id (admin only).
@@ -142,7 +146,7 @@ def read_user_by_id(
     Raises:
         HTTPException: If user is not found
     """
-    user = db.query(models.User).filter(models.User.id == user_id).first()
+    user = db.query(db_models.User).filter(db_models.User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -157,7 +161,7 @@ def update_user(
     db: Session = Depends(get_db),
     user_id: int,
     user_in: UserUpdate,
-    current_user: models.User = Depends(get_current_active_superuser),
+    current_user: db_models.User = Depends(get_current_active_superuser),
 ) -> Any:
     """Update a user (admin only).
     
@@ -173,7 +177,7 @@ def update_user(
     Raises:
         HTTPException: If user is not found
     """
-    user = db.query(models.User).filter(models.User.id == user_id).first()
+    user = db.query(db_models.User).filter(db_models.User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -201,7 +205,7 @@ def delete_user(
     *,
     db: Session = Depends(get_db),
     user_id: int,
-    current_user: models.User = Depends(get_current_active_superuser),
+    current_user: db_models.User = Depends(get_current_active_superuser),
 ) -> Any:
     """Delete a user (admin only).
     
@@ -216,7 +220,7 @@ def delete_user(
     Raises:
         HTTPException: If user is not found
     """
-    user = db.query(models.User).filter(models.User.id == user_id).first()
+    user = db.query(db_models.User).filter(db_models.User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

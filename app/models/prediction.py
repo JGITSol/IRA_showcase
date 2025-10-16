@@ -2,13 +2,11 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import Boolean, Float, ForeignKey, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from pydantic import BaseModel, Field
 
-from app.db.base import Base
+from app.db import models as db_models
 
 
 class Region(str, Enum):
@@ -73,78 +71,4 @@ class Prediction(PredictionInDBBase):
     pass
 
 
-class PredictionModel(Base):
-    """SQLAlchemy model for predictions table."""
-    
-    __tablename__ = "predictions"
-    
-    # User relationship
-    user_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-        comment="ID of the user who created the prediction"
-    )
-    
-    # Prediction fields
-    age: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        comment="Age of the policyholder (18-100)"
-    )
-    sex: Mapped[str] = mapped_column(
-        String(10),
-        nullable=False,
-        comment="Gender of the policyholder"
-    )
-    bmi: Mapped[float] = mapped_column(
-        Float,
-        nullable=False,
-        comment="Body mass index (0-60)"
-    )
-    children: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        comment="Number of children/dependents (0-10)"
-    )
-    smoker: Mapped[bool] = mapped_column(
-        Boolean,
-        nullable=False,
-        comment="Whether the policyholder is a smoker"
-    )
-    region: Mapped[str] = mapped_column(
-        String(20),
-        nullable=False,
-        comment="Region where the policyholder lives"
-    )
-    charges: Mapped[Optional[float]] = mapped_column(
-        Float,
-        nullable=True,
-        comment="Insurance charges"
-    )
-    risk_score: Mapped[Optional[float]] = mapped_column(
-        Float,
-        nullable=True,
-        comment="Risk score (0-100)"
-    )
-    
-    # Relationships
-    user: Mapped["UserModel"] = relationship("UserModel", back_populates="predictions")
-    
-    def to_schema(self) -> Prediction:
-        """Convert to Pydantic model for API responses."""
-        return Prediction.model_validate({
-            "id": self.id,
-            "user_id": self.user_id,
-            "age": self.age,
-            "sex": self.sex,
-            "bmi": self.bmi,
-            "children": self.children,
-            "smoker": self.smoker,
-            "region": self.region,
-            "charges": self.charges,
-            "risk_score": self.risk_score,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-        })
+PredictionModel = db_models.Prediction
